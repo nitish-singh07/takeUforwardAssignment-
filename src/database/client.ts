@@ -39,11 +39,9 @@ export const initMigrations = async (): Promise<void> => {
   const result = await db.getFirstAsync<{ version: number }>('SELECT MAX(version) as version FROM _migrations;');
   const currentVersion = result?.version || 0;
 
-  // 3. Define Migration Steps
+  // ── v1: Initial Schema ────────────────────────────────────────────────────
   if (currentVersion < 1) {
-    // Version 1: Initial Schema
     await db.withTransactionAsync(async () => {
-      // Users Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
@@ -59,12 +57,11 @@ export const initMigrations = async (): Promise<void> => {
         );
       `);
 
-      // Transactions Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS transactions (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
-          type TEXT NOT NULL, -- 'income' | 'expense'
+          type TEXT NOT NULL,
           amount REAL NOT NULL,
           category TEXT NOT NULL,
           note TEXT,
@@ -82,24 +79,34 @@ export const initMigrations = async (): Promise<void> => {
     console.log('Migration to version 1 complete.');
   }
 
-  // Future migrations go here (if currentVersion < 2)
+  // ── v2: Categories table ──────────────────────────────────────────────────
   if (currentVersion < 2) {
     await db.withTransactionAsync(async () => {
-      // Categories Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS categories (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
           name TEXT NOT NULL,
-          type TEXT NOT NULL, -- 'income' | 'expense'
+          type TEXT NOT NULL,
           icon TEXT NOT NULL,
           created_at INTEGER NOT NULL,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
       `);
-
       await db.execAsync('INSERT INTO _migrations (version) VALUES (2);');
     });
     console.log('Migration to version 2 complete.');
+  }
+
+  // ── v3: Add merchant + payment_method columns ─────────────────────────────
+  // merchant     = "Paid to" / payee name shown on the form
+  // payment_method = 'cash' | 'upi' | 'card' | ...
+  if (currentVersion < 3) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN merchant TEXT;`);
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN payment_method TEXT DEFAULT 'cash';`);
+      await db.execAsync('INSERT INTO _migrations (version) VALUES (3);');
+    });
+    console.log('Migration to version 3 complete.');
   }
 };

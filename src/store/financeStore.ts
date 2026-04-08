@@ -22,12 +22,14 @@ interface FinanceState {
 
   /** Add a new income / expense entry. */
   addTransaction: (
-    userId:    string,
-    type:      'income' | 'expense',
-    category:  string,
-    amount:    number,
-    note?:     string,
-    timestamp?: number
+    userId:          string,
+    type:            'income' | 'expense',
+    category:        string,
+    amount:          number,
+    note?:           string,
+    timestamp?:      number,
+    merchant?:       string,
+    payment_method?: string
   ) => Promise<boolean>;
 
   /** Update an existing transaction by id. */
@@ -88,10 +90,10 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     }
   },
 
-  addTransaction: async (userId, type, category, amount, note, timestamp) => {
+  addTransaction: async (userId, type, category, amount, note, timestamp, merchant, payment_method) => {
     set({ loading: true });
     try {
-      await TransactionRepository.addTransaction(userId, type, category, amount, note, timestamp);
+      await TransactionRepository.addTransaction(userId, type, category, amount, note, timestamp, merchant, payment_method);
       await get().recalculateUserMetrics(userId);
       await get().fetchData(userId);
       return true;

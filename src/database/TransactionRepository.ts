@@ -6,46 +6,50 @@ import { ExpenseRecord } from '../types';
  * Repository for managing transactions, expenses, and income in SQLite.
  */
 export class TransactionRepository {
-  /**
-   * Save a new transaction as an atomic insert.
-   * @param timestamp Optional custom date (ms). Defaults to now.
-   */
   static async addTransaction(
-    userId:    string,
-    type:      'income' | 'expense',
-    category:  string,
-    amount:    number,
-    note?:     string,
-    timestamp?: number
+    userId:          string,
+    type:            'income' | 'expense',
+    category:        string,
+    amount:          number,
+    note?:           string,
+    timestamp?:      number,
+    merchant?:       string,
+    payment_method?: string
   ): Promise<ExpenseRecord> {
     const db  = await getDatabase();
     const id  = Crypto.randomUUID();
     const now = Date.now();
     const ts  = timestamp ?? now;
+    const pm  = payment_method ?? 'cash';
 
     const tx: ExpenseRecord = {
       id,
       category,
       amount,
-      description: note || '',
-      trend:       type === 'income' ? 'increment' : 'decrement',
-      timestamp:   ts,
-      created_at:  now,
-      updated_at:  now,
-      sync_status: 'pending',
-      remote_id:   null,
+      description:    note || '',
+      merchant:       merchant || undefined,
+      payment_method: pm,
+      trend:          type === 'income' ? 'increment' : 'decrement',
+      timestamp:      ts,
+      created_at:     now,
+      updated_at:     now,
+      sync_status:    'pending',
+      remote_id:      null,
     };
 
     await db.runAsync(
       `INSERT INTO transactions
-         (id, user_id, type, amount, category, note, timestamp, created_at, updated_at, sync_status, remote_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+         (id, user_id, type, amount, category, note, timestamp, created_at, updated_at,
+          sync_status, remote_id, merchant, payment_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [tx.id, userId, type, tx.amount, tx.category, tx.description,
-       tx.timestamp, tx.created_at, tx.updated_at, tx.sync_status, tx.remote_id]
+       tx.timestamp, tx.created_at, tx.updated_at, tx.sync_status, tx.remote_id,
+       tx.merchant ?? null, pm]
     );
 
     return tx;
   }
+
 
   /**
    * Full-featured search with optional filters:

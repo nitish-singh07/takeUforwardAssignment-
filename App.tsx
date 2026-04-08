@@ -19,12 +19,13 @@ import { initMigrations }  from './src/database/client';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 // Screens & components
-import { Header }         from './src/components/Header';
-import { WelcomeScreen }  from './src/screens/WelcomeScreen';
-import { HomeScreen }     from './src/screens/HomeScreen';
-import { BalancesScreen } from './src/screens/BalancesScreen';
-import { ProfileScreen }  from './src/screens/ProfileScreen';
-import { SearchScreen }   from './src/screens/SearchScreen';
+import { Header }               from './src/components/Header';
+import { WelcomeScreen }         from './src/screens/WelcomeScreen';
+import { HomeScreen }            from './src/screens/HomeScreen';
+import { BalancesScreen }        from './src/screens/BalancesScreen';
+import { ProfileScreen }         from './src/screens/ProfileScreen';
+import { SearchScreen }          from './src/screens/SearchScreen';
+import { AddTransactionScreen }  from './src/screens/AddTransactionScreen';
 
 LogBox.ignoreAllLogs();
 
@@ -109,17 +110,16 @@ function AuthenticatedStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {/* Main tabs — no header managed by Stack */}
-      <Stack.Screen name="Main" component={MainTabs} />
-
-      {/* Search screen — native push transition */}
+      <Stack.Screen name="Main"           component={MainTabs} />
       <Stack.Screen
         name="Search"
         component={SearchScreen}
-        options={{
-          animation:       'slide_from_right',
-          headerShown:     false,
-          contentStyle:    { backgroundColor: colors.background },
-        }}
+        options={{ animation: 'slide_from_right', headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      />
+      <Stack.Screen
+        name="AddTransaction"
+        component={AddTransactionScreen}
+        options={{ animation: 'slide_from_bottom', headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
     </Stack.Navigator>
   );

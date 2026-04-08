@@ -9,7 +9,7 @@
  *   4. Financial Health Gauge (score derived from selected period)
  */
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -20,16 +20,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import BottomSheet from '@gorhom/bottom-sheet';
 import { Spacing, Radii } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { Typography } from '../components/common/Typography';
 import { CreditGauge } from '../components/ui/CreditGauge';
 import { SpendingChart } from '../components/ui/SpendingChart';
-import { AddTransactionSheet } from '../components/ui/AddTransactionSheet';
 import { useAuthStore } from '../store/authStore';
 import { useFinanceStore } from '../store/financeStore';
 import { useSettingsStore } from '../store/settingsStore';
+import { useNavigation } from '@react-navigation/native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -258,7 +257,7 @@ export const BalancesScreen: React.FC = () => {
   }                  = useFinanceStore();
   const triggerHaptic = useSettingsStore(state => state.triggerHaptic);
   const { colors }   = useTheme();
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const navigation   = useNavigation();
 
   const [period,    setPeriod]    = useState<Period>('weekly');
   const [refreshing, setRefreshing] = useState(false);
@@ -299,7 +298,7 @@ export const BalancesScreen: React.FC = () => {
 
   const handleAddPress = () => {
     triggerHaptic('selection');
-    bottomSheetRef.current?.expand();
+    (navigation as any).navigate('AddTransaction');
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -362,12 +361,6 @@ export const BalancesScreen: React.FC = () => {
       <TouchableOpacity style={[styles.fab, { backgroundColor: colors.text }]} onPress={handleAddPress}>
         <Ionicons name="add" size={30} color={colors.background} />
       </TouchableOpacity>
-
-      <AddTransactionSheet
-        ref={bottomSheetRef}
-        initialTransaction={null}
-        onSuccess={() => user && fetchData(user.id)}
-      />
     </SafeAreaView>
   );
 };

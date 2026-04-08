@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -17,8 +17,7 @@ import { ExpenseListItem } from '../components/ui/ExpenseListItem';
 import { useAuthStore } from '../store/authStore';
 import { useFinanceStore } from '../store/financeStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { AddTransactionSheet } from '../components/ui/AddTransactionSheet';
-import BottomSheet from '@gorhom/bottom-sheet';
+import { useNavigation } from '@react-navigation/native';
 import { ExpenseRecord } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -352,7 +351,7 @@ export const HomeScreen: React.FC = () => {
   const { user }              = useAuthStore();
   const { transactions, monthlySummary, fetchData, loading } = useFinanceStore();
   const triggerHaptic         = useSettingsStore(state => state.triggerHaptic);
-  const bottomSheetRef        = useRef<BottomSheet>(null);
+  const navigation            = useNavigation();
 
   // Recent = last 10, All = everything
   const RECENT_COUNT          = 10;
@@ -374,15 +373,13 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleAddPress = () => {
-    setSelectedTransaction(null);
     triggerHaptic('selection');
-    bottomSheetRef.current?.expand();
+    (navigation as any).navigate('AddTransaction');
   };
 
   const handleEditPress = (tx: ExpenseRecord) => {
-    setSelectedTransaction(tx);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    bottomSheetRef.current?.expand();
+    (navigation as any).navigate('AddTransaction', { transaction: tx });
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -520,11 +517,6 @@ export const HomeScreen: React.FC = () => {
         <Ionicons name="add" size={30} color={colors.background} />
       </TouchableOpacity>
 
-      <AddTransactionSheet
-        ref={bottomSheetRef}
-        initialTransaction={selectedTransaction}
-        onSuccess={() => user && fetchData(user.id)}
-      />
     </SafeAreaView>
   );
 };

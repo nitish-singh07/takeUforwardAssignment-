@@ -30,7 +30,9 @@ export interface UserProfile extends BaseEntity {
 export interface ExpenseRecord extends BaseEntity {
   category: string;
   amount: number;
-  description: string;
+  description: string;    // note / tag
+  merchant?: string;      // "Paid to" payee name
+  payment_method?: string; // 'cash' | 'upi' | 'card' | 'bank'
   trend: 'increment' | 'decrement';
   timestamp: number;
 }
