@@ -3,14 +3,15 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 
+export type ThemeMode = 'dark' | 'light' | 'system';
+
 interface SettingsState {
   hapticsEnabled: boolean;
-  
-  /**
-   * Toggle haptic feedback setting globally.
-   */
+  themeMode: ThemeMode;
+
   setHapticsEnabled: (enabled: boolean) => void;
-  
+  setThemeMode: (mode: ThemeMode) => void;
+
   /**
    * Safe wrapper for haptic feedback that respects the global setting.
    */
@@ -21,8 +22,10 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       hapticsEnabled: true,
+      themeMode: 'system', // default: follow OS
 
       setHapticsEnabled: (enabled) => set({ hapticsEnabled: enabled }),
+      setThemeMode: (mode) => set({ themeMode: mode }),
 
       triggerHaptic: (type) => {
         const { hapticsEnabled } = get();

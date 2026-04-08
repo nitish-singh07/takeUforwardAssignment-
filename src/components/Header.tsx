@@ -1,101 +1,75 @@
-import React, { useState, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  Pressable,
-  Animated,
-  TextInput,
-  Dimensions,
-} from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radii } from '../constants/theme';
+import { useNavigation } from '@react-navigation/native';
+import { Spacing, Radii } from '../constants/theme';
 import { Typography } from './common/Typography';
+import { useTheme } from '../context/ThemeContext';
 import * as Haptic from '../utils/haptic';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// ─── Component ───────────────────────────────────────────────────────────────
 
+/**
+ * Global header shown on Home and Balances tabs.
+ *
+ * Search icon navigates to the SearchScreen (NativeStack push)
+ * so the transition is a native slide — no inline animation needed.
+ */
 export const Header: React.FC = () => {
-  const insets = useSafeAreaInsets();
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const searchAnimation = useRef(new Animated.Value(0)).current;
-  const inputRef = useRef<TextInput>(null);
+  const insets     = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const navigation = useNavigation<any>();
 
-  const toggleSearch = () => {
+  const handleSearchPress = () => {
     Haptic.tap();
-    if (isSearchVisible) {
-      Animated.timing(searchAnimation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false,
-      }).start(() => setIsSearchVisible(false));
-    } else {
-      setIsSearchVisible(true);
-      Animated.timing(searchAnimation, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: false,
-      }).start(() => inputRef.current?.focus());
-    }
+    navigation.navigate('Search');
   };
-
-  const searchWidth = searchAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [40, SCREEN_WIDTH - 160],
-  });
-
-  const logoOpacity = searchAnimation.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0, 0],
-  });
 
   return (
     <View
       style={[
-        styles.headerWrapper,
-        { paddingTop: insets.top + 10, height: 75 + insets.top },
+        styles.bar,
+        {
+          backgroundColor:    colors.background,
+          borderBottomColor:  colors.border,
+          paddingTop:         insets.top + 10,
+          height:             75 + insets.top,
+        },
       ]}
     >
-      <Animated.View style={[styles.headerLeft, { opacity: logoOpacity }]}>
-        <View style={styles.logoBox}>
-          <Typography variant="bodySemiBold" color="black" style={styles.logoLetter}>
+      {/* Left — logo + wordmark */}
+      <View style={styles.logoRow}>
+        <View style={[styles.logoBox, { backgroundColor: colors.text }]}>
+          <Typography variant="bodySemiBold" color="textInverse" style={styles.logoLetter}>
             P
           </Typography>
         </View>
-        <Typography variant="heading3" color="text" style={styles.headerTitle}>
+        <Typography variant="heading3" color="text" style={styles.wordmark}>
           PayU
         </Typography>
-      </Animated.View>
+      </View>
 
-      <View style={styles.headerRight}>
-        <Animated.View style={[styles.searchContainer, { width: searchWidth, borderColor: isSearchVisible ? Colors.dark.border : 'transparent' }]}>
-          <Pressable onPress={toggleSearch} style={styles.searchIconButton}>
-            <Ionicons
-              name={isSearchVisible ? 'close' : 'search'}
-              size={22}
-              color={Colors.dark.textSecondary}
-            />
-          </Pressable>
-          {isSearchVisible && (
-            <TextInput
-              ref={inputRef}
-              style={styles.searchInput}
-              placeholder="Search..."
-              placeholderTextColor={Colors.dark.textTertiary}
-              autoFocus
-            />
-          )}
-        </Animated.View>
-
+      {/* Right — search + notifications */}
+      <View style={styles.actions}>
+        {/* Search button — navigates to SearchScreen */}
         <Pressable
-          style={styles.notificationButton}
+          onPress={handleSearchPress}
+          style={[styles.iconBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
+        </Pressable>
+
+        {/* Notification bell */}
+        <Pressable
+          style={styles.iconBtn}
           onPress={() => Haptic.select()}
         >
-          <Ionicons name="notifications-outline" size={24} color={Colors.dark.text} />
-          <View style={styles.badge}>
-            <Typography variant="caption" color="white" style={styles.badgeText}>
-              2
-            </Typography>
+          <Ionicons name="notifications-outline" size={22} color={colors.text} />
+          {/* Badge */}
+          <View style={[styles.badge, { backgroundColor: colors.error, borderColor: colors.background }]}>
+            <Typography variant="caption" style={styles.badgeText}>2</Typography>
           </View>
         </Pressable>
       </View>
@@ -103,84 +77,63 @@ export const Header: React.FC = () => {
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  headerWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  bar: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
     paddingHorizontal: Spacing['2xl'],
-    backgroundColor: Colors.dark.background,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
   },
-  headerLeft: {
+  logoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
+    alignItems:    'center',
+    gap:           Spacing.md,
   },
   logoBox: {
-    width: 32,
-    height: 32,
-    backgroundColor: Colors.dark.text,
-    borderRadius: Radii.md,
+    width:          32,
+    height:         32,
+    borderRadius:   Radii.md,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems:     'center',
   },
   logoLetter: {
     fontWeight: '900',
   },
-  headerTitle: {
-    fontWeight: '700',
+  wordmark: {
+    fontWeight:    '700',
     letterSpacing: -0.5,
   },
-  headerRight: {
+  actions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
+    alignItems:    'center',
+    gap:           Spacing.md,
   },
-  searchContainer: {
-    height: 48,
-    borderRadius: Radii.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  searchIconButton: {
-    width: 48,
-    height: 48,
+  iconBtn: {
+    position:       'relative',
+    width:          40,
+    height:         40,
+    borderRadius:   Radii.full,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchInput: {
-    flex: 1,
-    color: Colors.dark.text,
-    fontSize: 16,
-    paddingRight: Spacing.lg,
-  },
-  notificationButton: {
-    position: 'relative',
-    width: 44,
-    height: 44,
-    borderRadius: Radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems:     'center',
+    borderWidth:    1,
   },
   badge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: Colors.dark.error,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    position:     'absolute',
+    top:          2,
+    right:        2,
+    width:        16,
+    height:       16,
+    borderRadius: 8,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.dark.background,
+    alignItems:     'center',
+    borderWidth:  2,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize:   9,
     fontWeight: '900',
+    color:      '#fff',
   },
 });

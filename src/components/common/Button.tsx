@@ -1,19 +1,19 @@
+import React from 'react';
 import {
   TouchableOpacity,
   TouchableOpacityProps,
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
-  ColorValue,
 } from 'react-native';
-import { Colors, Spacing, Radii, Typography as TypographyStyles, ColorScheme } from '../../constants/theme';
+import { Spacing, Radii } from '../../constants/theme';
 import { Typography } from './Typography';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ButtonProps extends TouchableOpacityProps {
   label: string;
   variant?: 'primary' | 'secondary' | 'ghost' | 'error';
   loading?: boolean;
-  scheme?: ColorScheme;
   style?: ViewStyle;
 }
 
@@ -21,30 +21,39 @@ export const Button: React.FC<ButtonProps> = ({
   label,
   variant = 'primary',
   loading = false,
-  scheme = 'dark',
   style,
   disabled,
   ...props
 }) => {
-  const themeColors = Colors[scheme];
-  
+  const { colors, scheme } = useTheme();
+  const isDisabled = disabled || loading;
+
   const getButtonStyle = () => {
+    if (isDisabled) {
+      // Elegant disabled style — muted surface with reduced opacity for both themes
+      return {
+        backgroundColor: scheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        borderColor: scheme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+        borderWidth: 1,
+      };
+    }
+
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: themeColors.text, // White/Light in dark mode
-          borderColor: themeColors.text,
+          backgroundColor: colors.text,
+          borderColor: colors.text,
         };
       case 'secondary':
         return {
-          backgroundColor: themeColors.backgroundSecondary,
-          borderColor: themeColors.border,
+          backgroundColor: colors.backgroundSecondary,
+          borderColor: colors.border,
           borderWidth: 1,
         };
       case 'error':
         return {
-          backgroundColor: themeColors.error,
-          borderColor: themeColors.error,
+          backgroundColor: colors.error,
+          borderColor: colors.error,
         };
       case 'ghost':
         return {
@@ -56,32 +65,34 @@ export const Button: React.FC<ButtonProps> = ({
     }
   };
 
-  const getLabelColor = (): keyof typeof Colors.dark => {
-    if (variant === 'primary') return 'textInverse';
-    if (variant === 'error') return 'white' as any;
-    return 'text';
+  const getLabelColor = () => {
+    if (isDisabled) {
+      return scheme === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)';
+    }
+    if (variant === 'primary') return colors.textInverse;
+    if (variant === 'error') return '#FFFFFF';
+    return colors.text;
+  };
+
+  const getIndicatorColor = () => {
+    if (isDisabled) return scheme === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)';
+    if (variant === 'primary') return colors.textInverse;
+    return colors.text;
   };
 
   return (
     <TouchableOpacity
-      style={[
-        styles.base,
-        getButtonStyle(),
-        disabled && { opacity: 0.5 },
-        style,
-      ]}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
+      style={[styles.base, getButtonStyle(), style]}
+      disabled={isDisabled}
+      activeOpacity={0.75}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={themeColors[getLabelColor() as keyof typeof themeColors] as ColorValue} />
+        <ActivityIndicator color={getIndicatorColor()} />
       ) : (
         <Typography
           variant="label"
-          scheme={scheme}
-          color={getLabelColor()}
-          style={styles.labelStyle}
+          style={{ ...styles.labelStyle, color: getLabelColor() }}
         >
           {label}
         </Typography>

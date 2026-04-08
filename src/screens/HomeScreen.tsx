@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radii, Gradients } from '../constants/theme';
+import * as Haptics from 'expo-haptics';
+import { Spacing, Radii, Gradients } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Typography } from '../components/common/Typography';
 import { Card } from '../components/common/Card';
 import { TabSwitch } from '../components/common/TabSwitch';
@@ -19,30 +21,49 @@ import { useSettingsStore } from '../store/settingsStore';
 import { AddTransactionSheet } from '../components/ui/AddTransactionSheet';
 import BottomSheet from '@gorhom/bottom-sheet';
 
+import { ExpenseRecord } from '../types';
+
 export const HomeScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(0); // 0: Weekly, 1: Monthly
+  const [activeTab, setActiveTab] = useState(0);
+  const [selectedTransaction, setSelectedTransaction] = useState<ExpenseRecord | null>(null);
+  const { colors } = useTheme();
+
   const { user } = useAuthStore();
-  const { transactions, fetchTransactions, loading } = useFinanceStore();
+  const { transactions, categories, fetchData, loading } = useFinanceStore();
   const triggerHaptic = useSettingsStore(state => state.triggerHaptic);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
+  // 0 = Recent (last 10), 1 = All
+  const displayedTransactions = activeTab === 0
+    ? transactions.slice(0, 10)
+    : transactions;
+
   useEffect(() => {
     if (user) {
-      fetchTransactions(user.id);
+      fetchData(user.id);
     }
   }, [user]);
 
   const onRefresh = () => {
     if (user) {
       triggerHaptic('selection');
-      fetchTransactions(user.id);
+      fetchData(user.id);
     }
   };
 
   const handleAddPress = () => {
+    setSelectedTransaction(null);
     triggerHaptic('selection');
     bottomSheetRef.current?.expand();
   };
+
+  const handleEditPress = (tx: ExpenseRecord) => {
+    setSelectedTransaction(tx);
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    bottomSheetRef.current?.expand();
+  };
+
+  const styles = makeStyles(colors);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -50,7 +71,7 @@ export const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={Colors.dark.text} />
+          <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.text} />
         }
       >
         {/* Header Greeting */}
@@ -116,25 +137,21 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.expenseList}>
             {transactions.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="receipt-outline" size={48} color={Colors.dark.border} />
+                <Ionicons name="receipt-outline" size={48} color={colors.border} />
                 <Typography variant="body" color="textSecondary" style={{ marginTop: Spacing.md }}>
                   No transactions yet.
                 </Typography>
               </View>
             ) : (
-              transactions.map((tx) => (
+              displayedTransactions.map((tx) => (
                 <ExpenseListItem
                   key={tx.id}
                   title={tx.category}
-                  subtitle={tx.description || tx.category}
+                  subtitle={tx.description || undefined}
                   amount={(tx.trend === 'decrement' ? '-' : '+') + '$' + tx.amount.toLocaleString()}
                   trend={tx.trend}
-                  iconName={
-                    tx.category === 'Food' ? 'restaurant-outline' :
-                    tx.category === 'Transport' ? 'car-outline' :
-                    tx.category === 'Salary' ? 'cash-outline' :
-                    'cart-outline'
-                  }
+                  timestamp={tx.timestamp}
+                  onLongPress={() => handleEditPress(tx)}
                 />
               ))
             )}
@@ -144,94 +161,96 @@ export const HomeScreen: React.FC = () => {
 
       {/* Floating Action Button */}
       <TouchableOpacity style={styles.fab} onPress={handleAddPress}>
-        <Ionicons name="add" size={32} color={Colors.dark.background} />
+        <Ionicons name="add" size={32} color={colors.background} />
       </TouchableOpacity>
 
       <AddTransactionSheet 
         ref={bottomSheetRef} 
-        onSuccess={() => user && fetchTransactions(user.id)}
+        initialTransaction={selectedTransaction}
+        onSuccess={() => user && fetchData(user.id)}
       />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  scrollContent: {
-    padding: Spacing['2xl'],
-    paddingBottom: 120, 
-  },
-  header: {
-    marginBottom: Spacing['3xl'],
-  },
-  greeting: {
-    marginBottom: Spacing.xs,
-  },
-  heroCard: {
-    height: 220,
-    justifyContent: 'space-between',
-    padding: Spacing['2xl'],
-    marginBottom: Spacing['4xl'],
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  bankName: {
-    fontWeight: '700',
-    opacity: 0.9,
-  },
-  cardNumber: {
-    fontSize: 28,
-    letterSpacing: 2,
-    marginVertical: Spacing.xl,
-    textAlign: 'center',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  label: {
-    opacity: 0.7,
-    marginBottom: 4,
-  },
-  expensesSection: {
-    flex: 1,
-  },
-  sectionTitle: {
-    marginBottom: Spacing.lg,
-  },
-  tabSwitch: {
-    marginBottom: Spacing.xl,
-  },
-  expenseList: {
-    marginTop: Spacing.md,
-    gap: Spacing.xs,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    opacity: 0.5,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: Spacing['4xl'],
-    right: Spacing['2xl'],
-    width: 64,
-    height: 64,
-    borderRadius: Radii.full,
-    backgroundColor: Colors.dark.text,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-});
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      padding: Spacing['2xl'],
+      paddingBottom: 120,
+    },
+    header: {
+      marginBottom: Spacing['3xl'],
+    },
+    greeting: {
+      marginBottom: Spacing.xs,
+    },
+    heroCard: {
+      height: 220,
+      justifyContent: 'space-between',
+      padding: Spacing['2xl'],
+      marginBottom: Spacing['4xl'],
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    bankName: {
+      fontWeight: '700',
+      opacity: 0.9,
+    },
+    cardNumber: {
+      fontSize: 28,
+      letterSpacing: 2,
+      marginVertical: Spacing.xl,
+      textAlign: 'center',
+    },
+    cardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+    },
+    label: {
+      opacity: 0.7,
+      marginBottom: 4,
+    },
+    expensesSection: {
+      flex: 1,
+    },
+    sectionTitle: {
+      marginBottom: Spacing.lg,
+    },
+    tabSwitch: {
+      marginBottom: Spacing.xl,
+    },
+    expenseList: {
+      marginTop: Spacing.md,
+      gap: Spacing.xs,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: 40,
+      opacity: 0.5,
+    },
+    fab: {
+      position: 'absolute',
+      bottom: Spacing['4xl'],
+      right: Spacing['2xl'],
+      width: 64,
+      height: 64,
+      borderRadius: Radii.full,
+      backgroundColor: colors.text,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    },
+  });

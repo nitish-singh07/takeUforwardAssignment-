@@ -83,4 +83,23 @@ export const initMigrations = async (): Promise<void> => {
   }
 
   // Future migrations go here (if currentVersion < 2)
+  if (currentVersion < 2) {
+    await db.withTransactionAsync(async () => {
+      // Categories Table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL, -- 'income' | 'expense'
+          icon TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+      `);
+
+      await db.execAsync('INSERT INTO _migrations (version) VALUES (2);');
+    });
+    console.log('Migration to version 2 complete.');
+  }
 };

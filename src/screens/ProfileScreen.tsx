@@ -1,257 +1,216 @@
-import React, { useState } from 'react';
+/**
+ * ProfileScreen
+ *
+ * Thin orchestrator — owns state and handlers only.
+ * All UI is delegated to dedicated components in src/components/profile/.
+ */
+
+import React, { useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { CentralModal }    from '../components/common/CentralModal';
+import { ThemePickerSheet } from '../components/common/ThemePickerSheet';
 import {
-  StyleSheet,
-  View,
-  ScrollView,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Switch,
-  Alert,
-  TextStyle,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radii } from '../constants/theme';
-import { Typography } from '../components/common/Typography';
-import { TabSwitch } from '../components/common/TabSwitch';
-import { Card } from '../components/common/Card';
-import { Input } from '../components/common/Input';
-import { Button } from '../components/common/Button';
-import { useAuthStore } from '../store/authStore';
-import { useSettingsStore } from '../store/settingsStore';
-import * as Haptics from 'expo-haptics';
+  ProfileHeroCard,
+  ProfileStatsRow,
+  ProfilePreferencesCard,
+  ProfileAccountCard,
+  EditProfileSheet,
+  EditProfileSheetHandle,
+} from '../components/profile';
+
+import { useAuthStore }     from '../store/authStore';
+import { useTheme }         from '../context/ThemeContext';
+import * as Haptics         from 'expo-haptics';
+import BottomSheet          from '@gorhom/bottom-sheet';
+import { Typography }       from '../components/common/Typography';
+import { Spacing }          from '../constants/theme';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type ModalInfo = {
+  visible:  boolean;
+  title:    string;
+  message:  string;
+  type:     'success' | 'error' | 'warning' | 'info';
+  onConfirm?: () => void;
+  confirmLabel?: string;
+};
+
+const CLOSED_MODAL: ModalInfo = {
+  visible: false, title: '', message: '', type: 'info',
+};
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export const ProfileScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(0); // 0: Preview, 1: Edit
-  const { user, logout } = useAuthStore();
-  const { hapticsEnabled, setHapticsEnabled, triggerHaptic } = useSettingsStore();
+  const { user, logout, updateProfile, deleteAccount, loading } = useAuthStore();
+  const { colors, themeMode } = useTheme();
 
-  const [fullName, setFullName] = useState(user?.fullName || '');
-  const [email, setEmail] = useState(user?.email || '');
+  // Sheet refs
+  const editSheetRef    = useRef<EditProfileSheetHandle>(null);
+  const themePickerRef  = useRef<BottomSheet>(null);
 
-  const handleLogout = () => {
-    triggerHaptic(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('Logout', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: () => {
-          triggerHaptic(Haptics.NotificationFeedbackType.Success);
-          logout();
-        },
+  // Edit-form state
+  const [editName,  setEditName]  = useState(user?.fullName ?? '');
+  const [editEmail, setEditEmail] = useState(user?.email    ?? '');
+
+  // Single modal state handles both info and confirm flows
+  const [modal, setModal] = useState<ModalInfo>(CLOSED_MODAL);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  const showInfo = (
+    title:   string,
+    message: string,
+    type:    ModalInfo['type'] = 'info',
+  ) => setModal({ visible: true, title, message, type });
+
+  const closeModal = () => setModal(CLOSED_MODAL);
+
+  // ── Edit profile ───────────────────────────────────────────────────────────
+
+  const openEditSheet = () => {
+    setEditName(user?.fullName  ?? '');
+    setEditEmail(user?.email    ?? '');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    editSheetRef.current?.open();
+  };
+
+  const handleSaveProfile = async () => {
+    editSheetRef.current?.close();
+    const result = await updateProfile(editName.trim(), editEmail.trim());
+
+    if (result.success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showInfo('Profile Updated', 'Your details have been saved.', 'success');
+    } else {
+      showInfo('Update Failed', result.error ?? 'Could not save changes.', 'error');
+    }
+  };
+
+  // ── Sign out ───────────────────────────────────────────────────────────────
+
+  const handleSignOutPress = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setModal({
+      visible:      true,
+      title:        'Sign Out',
+      message:      'Are you sure you want to sign out of your account?',
+      type:         'warning',
+      confirmLabel: 'Sign Out',
+      onConfirm: () => {
+        closeModal();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        logout();
       },
-    ]);
+    });
   };
 
-  const handleToggleHaptics = (val: boolean) => {
-    setHapticsEnabled(val);
-    if (val) triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+  // ── Delete account ─────────────────────────────────────────────────────────
+
+  const handleDeletePress = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    setModal({
+      visible:      true,
+      title:        'Delete Account',
+      message:      'This will permanently erase your account and all transactions. This action cannot be undone.',
+      type:         'error',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        closeModal();
+        const result = await deleteAccount();
+        if (!result.success) {
+          showInfo('Error', result.error ?? 'Failed to delete account.', 'error');
+        }
+      },
+    });
   };
+
+  // ── Guard ──────────────────────────────────────────────────────────────────
+
+  if (!user) return null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
+    <>
+      <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Profile Header */}
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarCircle}>
-              <Typography variant="heading2" color="black" style={styles.avatarText}>
-                {user?.fullName?.charAt(0) || 'P'}
-              </Typography>
-            </View>
-            <View>
-              <Typography variant="heading3" style={styles.profileName}>
-                {user?.fullName || 'User Name'}
-              </Typography>
-              <Typography variant="body" color="textSecondary">
-                {user?.email || 'user@example.com'}
-              </Typography>
-            </View>
-          </View>
+          {/* Premium Discord-style hero */}
+          <ProfileHeroCard user={user} onEditPress={openEditSheet} />
 
-          {/* Mode Switch */}
-          <TabSwitch
-            options={['Preview', 'Edit']}
-            activeIndex={activeTab}
-            onSelect={setActiveTab}
-            style={styles.tabSwitch}
+          {/* Balance / spending stats */}
+          <ProfileStatsRow
+            balance={user.balance}
+            totalSpendings={user.totalSpendings}
           />
 
-          {/* Dynamic Content */}
-          {activeTab === 0 ? (
-            <View style={styles.previewContainer}>
-              <Typography variant="heading4" style={styles.sectionTitle}>
-                Account Summary
-              </Typography>
-              <Card variant="solid" style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                  <Typography variant="body" color="textSecondary">Total balance:</Typography>
-                  <Typography variant="heading3" color="text">${user?.balance?.toLocaleString() || '0'}</Typography>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.infoRow}>
-                  <Typography variant="body" color="textSecondary">Total spendings:</Typography>
-                  <Typography variant="heading4" color="text">${user?.totalSpendings?.toLocaleString() || '0'}</Typography>
-                </View>
-              </Card>
+          {/* Appearance & haptics */}
+          <ProfilePreferencesCard
+            themeMode={themeMode}
+            onAppearancePress={() => themePickerRef.current?.expand()}
+          />
 
-              <Typography
-                variant="heading4"
-                style={StyleSheet.flatten([styles.sectionTitle, { marginTop: Spacing.xl }]) as TextStyle}
-              >
-                Settings
-              </Typography>
-              <Card variant="solid" style={styles.infoCard}>
-                <View style={styles.settingItem}>
-                  <View style={styles.settingLeft}>
-                    <View style={[styles.iconBox, { backgroundColor: '#EEF2FF' }]}>
-                      <Ionicons name="notifications" size={20} color="#4F46E5" />
-                    </View>
-                    <Typography variant="bodySemiBold">Haptic Feedback</Typography>
-                  </View>
-                  <Switch
-                    value={hapticsEnabled}
-                    onValueChange={handleToggleHaptics}
-                    trackColor={{ false: Colors.dark.border, true: Colors.dark.text }}
-                  />
-                </View>
-              </Card>
+          {/* Sign out, delete account */}
+          <ProfileAccountCard
+            onSignOutPress={handleSignOutPress}
+            onDeletePress={handleDeletePress}
+          />
 
-              <Button
-                label="Sign Out"
-                variant="ghost"
-                onPress={handleLogout}
-                style={styles.logoutButton}
-              />
-            </View>
-          ) : (
-            <View style={styles.editContainer}>
-              <Card variant="solid" style={styles.formCard}>
-                 <Input 
-                   label="Full Name" 
-                   placeholder="Enter your full name" 
-                   value={fullName}
-                   onChangeText={setFullName}
-                 />
-                 <Input 
-                   label="Email" 
-                   placeholder="Enter your email" 
-                   value={email}
-                   onChangeText={setEmail}
-                   keyboardType="email-address"
-                   autoCapitalize="none"
-                 />
-                
-                <Button 
-                  label="Update Details" 
-                  variant="primary" 
-                  style={styles.updateButton}
-                  onPress={() => {
-                    triggerHaptic(Haptics.NotificationFeedbackType.Success);
-                    Alert.alert('Profile', 'Feature coming soon: Local updates are saved in the DB but state sync is next.');
-                  }}
-                />
-              </Card>
-            </View>
-          )}
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Typography variant="caption" style={{ color: colors.textTertiary }}>
+              PayU Finance Manager • LocalFirst
+            </Typography>
+          </View>
         </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+
+      {/* Universal modal — info, success, error, confirm */}
+      <CentralModal
+        visible={modal.visible}
+        onClose={closeModal}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={modal.onConfirm}
+        confirmLabel={modal.confirmLabel}
+      />
+
+      {/* Edit profile sheet */}
+      <EditProfileSheet
+        ref={editSheetRef}
+        name={editName}
+        email={editEmail}
+        onNameChange={setEditName}
+        onEmailChange={setEditEmail}
+        onSave={handleSaveProfile}
+        loading={loading}
+      />
+
+      {/* Theme picker sheet */}
+      <ThemePickerSheet sheetRef={themePickerRef} />
+    </>
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  keyboardView: {
+  screen: {
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing['2xl'],
-    paddingBottom: 40,
+    paddingBottom: Spacing['4xl'],
   },
-  profileHeader: {
-    flexDirection: 'row',
+  footer: {
     alignItems: 'center',
-    marginBottom: Spacing['3xl'],
-  },
-  avatarCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: Radii.lg,
-    backgroundColor: Colors.dark.text,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.xl,
-  },
-  avatarText: {
-    fontWeight: '900',
-  },
-  profileName: {
-    fontWeight: '700',
-  },
-  tabSwitch: {
-    marginBottom: Spacing['4xl'],
-  },
-  previewContainer: {
-    flex: 1,
-  },
-  sectionTitle: {
-    marginBottom: Spacing.lg,
-    marginLeft: Spacing.xs,
-  },
-  infoCard: {
-    backgroundColor: Colors.dark.backgroundSecondary,
-    marginBottom: Spacing.lg,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.dark.border,
-    marginVertical: Spacing.xs,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: Radii.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoutButton: {
-    marginTop: Spacing['3xl'],
-    borderColor: Colors.dark.error,
-  },
-  editContainer: {
-    flex: 1,
-  },
-  formCard: {
-    backgroundColor: Colors.dark.backgroundSecondary,
-  },
-  updateButton: {
     marginTop: Spacing.xl,
+    opacity: 0.4,
   },
 });

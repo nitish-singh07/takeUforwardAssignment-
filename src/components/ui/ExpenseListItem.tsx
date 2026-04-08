@@ -1,102 +1,129 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radii, ColorScheme } from '../../constants/theme';
+import { Spacing, Radii } from '../../constants/theme';
 import { Typography } from '../common/Typography';
-import { Card } from '../common/Card';
+import { useTheme } from '../../context/ThemeContext';
+import { getCategoryConfig } from '../../utils/categoryConfig';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ExpenseListItemProps {
-  title: string;
-  subtitle: string;
-  amount: string;
-  iconName: keyof typeof Ionicons.glyphMap;
-  trend?: 'increment' | 'decrement';
-  onPress?: () => void;
-  scheme?: ColorScheme;
+  title:        string;
+  subtitle?:    string;
+  amount:       string;
+  trend:        'increment' | 'decrement';
+  /** Transaction timestamp (ms) — shown as formatted date. */
+  timestamp?:   number;
+  onPress?:     () => void;
+  onLongPress?: () => void;
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+
+  // Today → "Today, 2:30 PM"
+  if (d.toDateString() === now.toDateString()) {
+    return 'Today, ' + d.toLocaleTimeString('default', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Yesterday → "Yesterday"
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  }
+
+  // Otherwise → "8 Apr"
+  return d.toLocaleDateString('default', { day: 'numeric', month: 'short' });
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export const ExpenseListItem: React.FC<ExpenseListItemProps> = ({
   title,
   subtitle,
   amount,
-  iconName,
-  trend = 'decrement',
+  trend,
+  timestamp,
   onPress,
-  scheme = 'dark',
+  onLongPress,
 }) => {
-  const themeColors = Colors[scheme];
-  const amountColor = trend === 'increment' ? themeColors.success : themeColors.error;
+  const { colors } = useTheme();
+  const config = getCategoryConfig(title);
+
+  const amountColor = trend === 'increment' ? colors.success : colors.error;
+
+  // Subtle icon box background: category colour at ~15% opacity
+  const iconBg = config.color + '26';
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <Card
-        style={StyleSheet.flatten([styles.container, { borderColor: themeColors.border }]) as ViewStyle}
-        variant="solid"
-        scheme={scheme}
-      >
-        <View style={styles.leftSection}>
-          <View style={[styles.iconContainer, { backgroundColor: themeColors.backgroundSecondary }]}>
-            <Ionicons name={iconName} size={24} color={themeColors.text} />
-          </View>
-          <View style={styles.textContainer}>
-            <Typography variant="bodySemiBold" color="text" scheme={scheme}>
-              {title}
-            </Typography>
-            <Typography variant="caption" color="textSecondary" scheme={scheme}>
-              {subtitle}
-            </Typography>
-          </View>
-        </View>
-        
-        <View style={styles.rightSection}>
-          <Ionicons name="star-outline" size={20} color={themeColors.textTertiary} style={styles.starIcon} />
-          <View style={[styles.amountBadge, { backgroundColor: themeColors.background }]}>
-            <Typography variant="bodySemiBold" color="text" scheme={scheme} style={{ color: amountColor }}>
-              {amount}
-            </Typography>
-          </View>
-        </View>
-      </Card>
+    <TouchableOpacity
+      onPress={onPress}
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
+      style={[
+        styles.row,
+        { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+      ]}
+    >
+      {/* Category icon box */}
+      <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+        <Ionicons name={config.icon} size={22} color={config.color} />
+      </View>
+
+      {/* Text block */}
+      <View style={styles.textBlock}>
+        <Typography variant="bodySemiBold">{title}</Typography>
+        {subtitle ? (
+          <Typography variant="caption" style={{ color: colors.textTertiary }}>
+            {subtitle}
+          </Typography>
+        ) : null}
+        {timestamp ? (
+          <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: 1 }}>
+            {formatDate(timestamp)}
+          </Typography>
+        ) : null}
+      </View>
+
+      {/* Amount */}
+      <View style={styles.amountBlock}>
+        <Typography variant="bodySemiBold" style={{ color: amountColor }}>
+          {amount}
+        </Typography>
+      </View>
     </TouchableOpacity>
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
+  row: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    borderRadius:   Radii.xl,
+    borderWidth:    1,
+    padding:        Spacing.md,
+    gap:            Spacing.md,
+    marginBottom:   Spacing.sm,
   },
-  leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: Radii.lg,
+  iconBox: {
+    width:          46,
+    height:         46,
+    borderRadius:   Radii.lg,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
+    alignItems:     'center',
   },
-  textContainer: {
+  textBlock: {
     flex: 1,
+    gap:  2,
   },
-  rightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  starIcon: {
-    marginRight: Spacing.md,
-  },
-  amountBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radii.md,
-    minWidth: 80,
-    alignItems: 'center',
+  amountBlock: {
+    alignItems: 'flex-end',
   },
 });

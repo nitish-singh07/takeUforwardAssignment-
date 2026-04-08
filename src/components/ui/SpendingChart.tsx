@@ -1,107 +1,275 @@
-import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Spacing, Typography, ColorScheme } from '../../constants/theme';
-import { Typography as Typos } from '../common/Typography';
+/**
+ * SpendingChart
+ *
+ * Grouped bar chart (Income vs Expense) powered by react-native-gifted-charts.
+ * Switches between weekly (per day) and monthly (per week) data views.
+ *
+ * Y-axis shows dollar-formatted labels.
+ * X-axis labels show day names (Mon, Tue…) or week names (Wk 1, Wk 2…).
+ * Today (weekly view) / current week (monthly view) bars are highlighted.
+ */
 
-interface DataPoint {
-  label: string;
-  value: number;
-  total: number;
-}
+import React, { useMemo } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import { BarChart } from 'react-native-gifted-charts';
+import { Typography } from '../common/Typography';
+import { useTheme } from '../../context/ThemeContext';
+import { WeeklyDataPoint } from '../../store/financeStore';
+import { Spacing, Radii } from '../../constants/theme';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const INCOME_COLOR  = '#10b981';
+const EXPENSE_COLOR = '#ef4444';
+const BAR_WIDTH     = 14;
+const BAR_SPACING   = 4;   // between income and expense bars in the same group
+const GROUP_SPACING = 18;  // between groups
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface SpendingChartProps {
-  data: DataPoint[];
-  scheme?: ColorScheme;
+  data:            WeeklyDataPoint[];
+  period:          'weekly' | 'monthly';
+  periodIncome:    number;
+  periodExpense:   number;
+  periodLabel:     string;  // e.g. "Week of 7 Apr" or "April 2026"
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatY(label: string): string {
+  const val = parseFloat(label);
+  if (isNaN(val)) return label;
+  if (val >= 1000) return `$${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k`;
+  return `$${val}`;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export const SpendingChart: React.FC<SpendingChartProps> = ({
   data,
-  scheme = 'dark',
+  period,
+  periodIncome,
+  periodExpense,
+  periodLabel,
 }) => {
-  const themeColors = Colors[scheme];
-  const chartHeight = 150;
-  
+  const { colors, scheme } = useTheme();
+  const screenWidth        = Dimensions.get('window').width;
+  const chartWidth         = screenWidth - Spacing['2xl'] * 2 - Spacing.xl;
+
+  // Which index is "current"? (today's DOW for weekly, current week for monthly)
+  const todayIdx = useMemo(() => {
+    if (period === 'weekly') return new Date().getDay(); // 0=Sun
+    // current week of month: day 1-7 → 0, 8-14 → 1, etc.
+    return Math.min(Math.floor((new Date().getDate() - 1) / 7), 3);
+  }, [period]);
+
+  const isEmpty = data.every(d => d.income === 0 && d.expense === 0);
+
+  // Build gifted-charts bar data:
+  // Each DataPoint group = two bars (income, expense) + spacing gap after
+  const barData = useMemo(() => {
+    const items: any[] = [];
+    data.forEach((point, i) => {
+      const isCurrentPeriod = i === todayIdx;
+      const alpha = isCurrentPeriod ? 'FF' : 'AA';
+
+      // Income bar
+      items.push({
+        value:       point.income,
+        frontColor:  INCOME_COLOR + alpha,
+        label:       point.label,
+        labelTextStyle: {
+          color:      isCurrentPeriod ? colors.text : colors.textTertiary,
+          fontSize:   10,
+          fontWeight: isCurrentPeriod ? '700' : '400',
+          width:      BAR_WIDTH * 2 + BAR_SPACING + 4,
+          textAlign:  'center',
+        },
+        spacing: BAR_SPACING,
+      });
+
+      // Expense bar (no label — label on income covers the group)
+      items.push({
+        value:       point.expense,
+        frontColor:  EXPENSE_COLOR + alpha,
+        spacing:     GROUP_SPACING,
+      });
+    });
+    return items;
+  }, [data, todayIdx, colors]);
+
+  const maxValue = useMemo(() => {
+    const all = data.flatMap(d => [d.income, d.expense]);
+    return Math.max(...all, 100); // min 100 so empty chart still looks reasonable
+  }, [data]);
+
+  // Round up maxValue to a nice number for the Y-axis
+  const yAxisMax = useMemo(() => {
+    const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
+    return Math.ceil(maxValue / magnitude) * magnitude;
+  }, [maxValue]);
+
+  const noActivityLabel = period === 'weekly' ? 'No activity this week' : 'No activity this month';
+
   return (
-    <View style={styles.container}>
-      {/* Chart Bars */}
-      <View style={[styles.chartArea, { height: chartHeight }]}>
-        {data.map((item, index) => {
-          const barHeight = (item.value / item.total) * chartHeight;
-          const bgHeight = chartHeight;
-          
-          return (
-            <View key={index} style={styles.barGroup}>
-              <View style={[styles.barBackground, { height: bgHeight, backgroundColor: themeColors.backgroundSecondary }]}>
-                <LinearGradient
-                  colors={['#3BB9A1', '#FBDE9D']}
-                  style={[styles.barForeground, { height: barHeight }]}
-                />
-              </View>
-            </View>
-          );
-        })}
+    <View style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View>
+          <Typography variant="bodySemiBold">Spending Patterns</Typography>
+          <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: 2 }}>
+            {periodLabel}
+          </Typography>
+        </View>
+        {/* Legend */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: INCOME_COLOR }]} />
+            <Typography variant="caption" style={{ color: colors.textSecondary }}>Income</Typography>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: EXPENSE_COLOR }]} />
+            <Typography variant="caption" style={{ color: colors.textSecondary }}>Expense</Typography>
+          </View>
+        </View>
       </View>
-      
-      {/* Legend / Info */}
-      <View style={styles.footer}>
-        <Typos variant="caption" color="textSecondary" scheme={scheme}>
-          Current margin: April Spendings
-        </Typos>
-        <View style={styles.marginInfo}>
-          <Typos variant="caption" color="primary" scheme={scheme} style={styles.valueText}>
-            $350.00
-          </Typos>
-          <Typos variant="caption" color="textTertiary" scheme={scheme} style={styles.separator}>
-             / 
-          </Typos>
-          <Typos variant="caption" color="textTertiary" scheme={scheme}>
-            $640.00
-          </Typos>
+
+      {/* ── Chart or empty state ── */}
+      {isEmpty ? (
+        <View style={styles.emptyState}>
+          <Typography variant="caption" style={{ color: colors.textTertiary }}>
+            {noActivityLabel}
+          </Typography>
+        </View>
+      ) : (
+        <View style={styles.chartWrapper}>
+          <BarChart
+            data={barData}
+            width={chartWidth}
+            height={180}
+            barWidth={BAR_WIDTH}
+            maxValue={yAxisMax}
+            noOfSections={4}
+            // Y-axis
+            yAxisTextStyle={{ color: colors.textTertiary, fontSize: 10 }}
+            yAxisColor={colors.border}
+            yAxisThickness={1}
+            formatYLabel={formatY}
+            // X-axis
+            xAxisColor={colors.border}
+            xAxisThickness={1}
+            // Reference lines (horizontal gridlines)
+            showReferenceLine1
+            referenceLine1Position={yAxisMax * 0.5}
+            referenceLine1Config={{
+              color:     colors.border,
+              dashWidth: 4,
+              dashGap:   6,
+              thickness: 1,
+            }}
+            // Visual
+            barBorderRadius={4}
+            isAnimated
+            animationDuration={600}
+            // Background
+            backgroundColor="transparent"
+            // Avoid clipping
+            disablePress
+          />
+        </View>
+      )}
+
+      {/* ── Footer summary ── */}
+      <View style={[styles.footer, { borderTopColor: colors.border }]}>
+        <View style={styles.footerItem}>
+          <Typography variant="caption" style={{ color: colors.textTertiary }}>
+            {period === 'weekly' ? 'Week Income' : 'Month Income'}
+          </Typography>
+          <Typography variant="bodySemiBold" style={{ color: INCOME_COLOR }}>
+            ${periodIncome.toLocaleString()}
+          </Typography>
+        </View>
+
+        <View style={[styles.footerDivider, { backgroundColor: colors.border }]} />
+
+        <View style={styles.footerItem}>
+          <Typography variant="caption" style={{ color: colors.textTertiary }}>
+            {period === 'weekly' ? 'Week Expense' : 'Month Expense'}
+          </Typography>
+          <Typography variant="bodySemiBold" style={{ color: EXPENSE_COLOR }}>
+            ${periodExpense.toLocaleString()}
+          </Typography>
+        </View>
+
+        <View style={[styles.footerDivider, { backgroundColor: colors.border }]} />
+
+        <View style={styles.footerItem}>
+          <Typography variant="caption" style={{ color: colors.textTertiary }}>Net</Typography>
+          <Typography
+            variant="bodySemiBold"
+            style={{ color: periodIncome - periodExpense >= 0 ? INCOME_COLOR : EXPENSE_COLOR }}
+          >
+            {periodIncome - periodExpense >= 0 ? '+' : ''}${(periodIncome - periodExpense).toLocaleString()}
+          </Typography>
         </View>
       </View>
     </View>
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: Spacing.xl,
-    paddingHorizontal: Spacing.md,
+  card: {
+    borderRadius:   Radii['2xl'],
+    borderWidth:    1,
+    overflow:       'hidden',
   },
-  chartArea: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  header: {
+    flexDirection:  'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.xl,
+    alignItems:     'flex-start',
+    padding:        Spacing.lg,
+    paddingBottom:  Spacing.sm,
   },
-  barGroup: {
-    alignItems: 'center',
-    flex: 1,
+  legend: {
+    gap: Spacing.xs,
+    alignItems: 'flex-end',
   },
-  barBackground: {
-    width: 32,
-    borderRadius: 8,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
+  legendItem: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           Spacing.xs,
   },
-  barForeground: {
-    width: '100%',
-    borderRadius: 8,
+  legendDot: {
+    width:        8,
+    height:       8,
+    borderRadius: 4,
+  },
+  chartWrapper: {
+    paddingLeft:    Spacing.sm,
+    paddingRight:   Spacing.sm,
+    paddingBottom:  Spacing.sm,
+  },
+  emptyState: {
+    height:         160,
+    justifyContent: 'center',
+    alignItems:     'center',
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection:  'row',
+    borderTopWidth: 1,
+    paddingVertical: Spacing.md,
   },
-  marginInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  footerItem: {
+    flex:        1,
+    alignItems:  'center',
+    gap:         3,
   },
-  valueText: {
-    fontWeight: '700',
-  },
-  separator: {
-    marginHorizontal: 4,
+  footerDivider: {
+    width: 1,
+    height: '100%',
   },
 });

@@ -25,6 +25,16 @@ export class UserRepository {
     passwordPlain: string
   ): Promise<UserProfile> {
     const db = await getDatabase();
+    
+    // Check if email already exists before creation
+    const existingUser = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM users WHERE email = ?;',
+      [email]
+    );
+    if (existingUser) {
+      throw new Error('EMAIL_EXISTS');
+    }
+
     const id = Crypto.randomUUID();
     const passwordHash = await this.hashPassword(passwordPlain);
     const now = Date.now();
@@ -64,19 +74,26 @@ export class UserRepository {
   /**
    * Find a user by email and verify password for local login.
    */
-  static async authenticate(email: string, passwordPlain: string): Promise<UserProfile | null> {
+  static async authenticate(email: string, passwordPlain: string): Promise<UserProfile> {
     const db = await getDatabase();
-    const passwordHash = await this.hashPassword(passwordPlain);
-
-    const user = await db.getFirstAsync<UserProfile & { password?: string }>(
-      'SELECT * FROM users WHERE email = ? AND password = ?;',
-      [email, passwordHash]
+    
+    // Check if email exists at all first
+    const userResult = await db.getFirstAsync<UserProfile & { password?: string }>(
+      'SELECT * FROM users WHERE email = ?;',
+      [email]
     );
 
-    if (!user) return null;
+    if (!userResult) {
+      throw new Error('USER_NOT_FOUND');
+    }
+
+    const passwordHash = await this.hashPassword(passwordPlain);
+    if (userResult.password !== passwordHash) {
+      throw new Error('INVALID_PASSWORD');
+    }
 
     // Remove sensitive data before returning
-    const { password: _, ...profile } = user;
+    const { password: _, ...profile } = userResult;
     return profile;
   }
 
@@ -98,4 +115,39 @@ export class UserRepository {
       [balance, totalSpendings, Date.now(), userId]
     );
   }
+
+  /**
+   * Update user profile (name and email).
+   */
+  static async updateProfile(userId: string, fullName: string, email: string): Promise<UserProfile> {
+    const db = await getDatabase();
+
+    // Check if the new email is taken by a different user
+    const existing = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM users WHERE email = ? AND id != ?;',
+      [email, userId]
+    );
+    if (existing) throw new Error('EMAIL_EXISTS');
+
+    await db.runAsync(
+      'UPDATE users SET fullName = ?, email = ?, updated_at = ? WHERE id = ?;',
+      [fullName, email, Date.now(), userId]
+    );
+
+    const updated = await db.getFirstAsync<UserProfile>('SELECT * FROM users WHERE id = ?;', [userId]);
+    if (!updated) throw new Error('USER_NOT_FOUND');
+    return updated;
+  }
+
+  /**
+   * Permanently delete a user account and all associated transactions.
+   */
+  static async deleteAccount(userId: string): Promise<void> {
+    const db = await getDatabase();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('DELETE FROM transactions WHERE userId = ?;', [userId]);
+      await db.runAsync('DELETE FROM users WHERE id = ?;', [userId]);
+    });
+  }
 }
+

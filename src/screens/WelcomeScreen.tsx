@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radii } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Typography } from '../components/common/Typography';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
@@ -17,6 +17,8 @@ import { TabSwitch } from '../components/common/TabSwitch';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import * as Haptics from 'expo-haptics';
+import { LoginSchema, SignupSchema } from '../utils/validation';
+import { CentralModal } from '../components/common/CentralModal';
 
 export const WelcomeScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0); // 0: Sign In, 1: Sign Up
@@ -24,32 +26,70 @@ export const WelcomeScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   
-  const { login, signup, loading, error } = useAuthStore();
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ title: '', message: '', type: 'error' as any });
+
+  const { login, signup, loading, clearError } = useAuthStore();
+  const { colors } = useTheme();
   const triggerHaptic = useSettingsStore(state => state.triggerHaptic);
 
+  const showError = (title: string, message: string) => {
+    setModalConfig({ title, message, type: 'error' });
+    setModalVisible(true);
+    triggerHaptic(Haptics.NotificationFeedbackType.Error);
+  };
+
   const handleAction = async () => {
-    if (!email || !password || (activeTab === 1 && !fullName)) {
-      triggerHaptic(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', 'Please fill in all fields.');
-      return;
+    // Validation with Zod (as a fallback)
+    if (activeTab === 1) {
+      const result = SignupSchema.safeParse({ fullName, email, password });
+      if (!result.success) {
+        showError('Validation Error', result.error.issues[0].message);
+        return;
+      }
+    } else {
+      const result = LoginSchema.safeParse({ email, password });
+      if (!result.success) {
+        showError('Validation Error', result.error.issues[0].message);
+        return;
+      }
     }
 
-    let success = false;
+    let result;
     if (activeTab === 0) {
-      success = await login(email, password);
+      result = await login(email, password);
     } else {
-      success = await signup(fullName, email, password);
+      result = await signup(fullName, email, password);
     }
 
-    if (success) {
-      triggerHaptic(Haptics.NotificationFeedbackType.Success);
-    } else {
-      triggerHaptic(Haptics.NotificationFeedbackType.Error);
+    if (!result.success) {
+      showError('Authentication Failed', result.error || 'An unexpected error occurred.');
     }
   };
 
+  const closeModal = () => {
+    setModalVisible(false);
+    clearError();
+  };
+
+  // Form Validation State for UI disabling
+  const isFormValid = useMemo(() => {
+    if (activeTab === 0) {
+      return LoginSchema.safeParse({ email, password }).success;
+    }
+    return SignupSchema.safeParse({ fullName, email, password }).success;
+  }, [activeTab, email, password, fullName]);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <CentralModal
+        visible={modalVisible}
+        onClose={closeModal}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -60,17 +100,19 @@ export const WelcomeScreen: React.FC = () => {
         >
           {/* Logo Section */}
           <View style={styles.header}>
-            <View style={styles.logoCircle}>
-              <Typography variant="heading2" color="black" style={styles.logoText}>
+            <View style={[styles.logoCircle, { backgroundColor: colors.text }]}>
+              <Typography variant="heading2" color="textInverse" style={styles.logoText}>
                 P
               </Typography>
             </View>
-            <Typography variant="heading1" style={styles.welcomeTitle}>
-              Welcome to PayU
-            </Typography>
-            <Typography variant="body" color="textSecondary" style={styles.subTitle}>
-              Send money globally with the real exchange rate
-            </Typography>
+            <View style={styles.headerInfo}>
+              <Typography variant="heading1" style={styles.welcomeTitle}>
+                Welcome to PayU
+              </Typography>
+              <Typography variant="body" color="textSecondary" style={styles.subTitle}>
+                Send money globally with the real exchange rate
+              </Typography>
+            </View>
           </View>
 
           {/* Form Card */}
@@ -122,17 +164,12 @@ export const WelcomeScreen: React.FC = () => {
               </Typography>
             )}
 
-            {error && (
-              <Typography variant="caption" color="error" style={styles.errorText}>
-                {error}
-              </Typography>
-            )}
-
             <Button
               label={activeTab === 0 ? 'Sign In' : 'Sign Up'}
-              variant="primary"
+              variant={isFormValid ? 'primary' : 'secondary'}
               onPress={handleAction}
               loading={loading}
+              disabled={!isFormValid && !loading}
               style={styles.actionButton}
             />
           </Card>
@@ -145,7 +182,7 @@ export const WelcomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.dark.background, // overridden by inline in JSX
   },
   keyboardView: {
     flex: 1,
@@ -163,7 +200,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: Radii.lg,
-    backgroundColor: Colors.dark.text,
+    backgroundColor: 'transparent', // overridden by inline in JSX
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xl,
@@ -171,36 +208,37 @@ const styles = StyleSheet.create({
   logoText: {
     fontWeight: '900',
   },
+  headerInfo: {
+    alignItems: 'center',
+    gap: 8,
+  },
   welcomeTitle: {
-    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   subTitle: {
     textAlign: 'center',
-    maxWidth: '80%',
+    paddingHorizontal: Spacing.xl,
   },
   formCard: {
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: 'transparent', // overridden by inline in JSX
+    padding: Spacing.xl,
   },
   cardTitle: {
-    marginBottom: Spacing.xs,
+    marginBottom: 4,
   },
   cardSubTitle: {
     marginBottom: Spacing.xl,
   },
   tabSwitch: {
-    marginBottom: Spacing['2xl'],
+    marginBottom: Spacing.xl,
   },
   forgotPassword: {
-    textAlign: 'right',
-    marginBottom: Spacing['2xl'],
+    alignSelf: 'flex-end',
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.lg,
     fontWeight: '600',
   },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
   actionButton: {
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
   },
 });

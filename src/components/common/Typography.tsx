@@ -1,27 +1,27 @@
 import React from 'react';
-import { Text, TextProps, StyleSheet, TextStyle } from 'react-native';
-import { Colors, Typography as TypographyStyles, ColorScheme } from '../../constants/theme';
+import { Text, TextProps, TextStyle } from 'react-native';
+import { Typography as TypographyStyles } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface CustomTypographyProps extends TextProps {
   variant?: keyof typeof TypographyStyles;
-  color?: keyof typeof Colors.dark;
-  scheme?: ColorScheme;
+  color?: string;
   style?: TextStyle;
 }
 
 export const Typography: React.FC<CustomTypographyProps> = ({
   variant = 'body',
   color = 'text',
-  scheme = 'dark',
   style,
   children,
   ...props
 }) => {
-  const themeColors = Colors[scheme];
+  const { colors } = useTheme();
   const typographyStyle = TypographyStyles[variant];
-  
-  // Type-safe color lookup excluding the 'gradients' object
-  const textColor = (themeColors[color as keyof typeof themeColors] as string) || themeColors.text;
+
+  // Resolve color: try as key in colors object, else treat as raw color value
+  const textColor =
+    (colors as any)[color] ?? color;
 
   return (
     <Text

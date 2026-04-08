@@ -5,24 +5,22 @@ import {
   TextInputProps,
   StyleSheet,
   TouchableOpacity,
-  Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radii, Typography, ColorScheme } from '../../constants/theme';
+import { Spacing, Radii } from '../../constants/theme';
 import { Typography as Typos } from './Typography';
+import { useTheme } from '../../context/ThemeContext';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   isPassword?: boolean;
-  scheme?: ColorScheme;
 }
 
 export const Input: React.FC<InputProps> = ({
   label,
   error,
   isPassword = false,
-  scheme = 'dark',
   style,
   onFocus,
   onBlur,
@@ -30,8 +28,7 @@ export const Input: React.FC<InputProps> = ({
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(!isPassword);
-  
-  const themeColors = Colors[scheme];
+  const { colors } = useTheme();
 
   const handleFocus = (e: any) => {
     setIsFocused(true);
@@ -46,33 +43,34 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View style={styles.container}>
       {label && (
-        <Typos variant="label" color="text" scheme={scheme} style={styles.label}>
+        <Typos variant="label" style={{ ...styles.label, color: colors.text }}>
           {label}
         </Typos>
       )}
-      
+
       <View
         style={[
           styles.inputWrapper,
           {
-            backgroundColor: themeColors.backgroundSecondary,
-            borderColor: error ? themeColors.error : isFocused ? themeColors.text : themeColors.border,
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: error
+              ? colors.error
+              : isFocused
+              ? colors.text
+              : colors.border,
           },
           style,
         ]}
       >
         <TextInput
-          style={[
-            styles.input,
-            { color: themeColors.text },
-          ]}
-          placeholderTextColor={themeColors.textTertiary}
+          style={[styles.input, { color: colors.text }]}
+          placeholderTextColor={colors.textTertiary}
           secureTextEntry={isPassword && !isPasswordVisible}
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...props}
         />
-        
+
         {isPassword && (
           <TouchableOpacity
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
@@ -81,14 +79,14 @@ export const Input: React.FC<InputProps> = ({
             <Ionicons
               name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
               size={20}
-              color={themeColors.textTertiary}
+              color={colors.textTertiary}
             />
           </TouchableOpacity>
         )}
       </View>
-      
+
       {error && (
-        <Typos variant="caption" color="error" scheme={scheme} style={styles.errorText}>
+        <Typos variant="caption" style={{ ...styles.errorText, color: colors.error }}>
           {error}
         </Typos>
       )}

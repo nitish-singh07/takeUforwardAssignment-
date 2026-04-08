@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, Platform, ColorValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Radii, Spacing, ColorScheme } from '../../constants/theme';
+import { Radii, Spacing } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface CardProps {
   children: React.ReactNode;
   variant?: 'solid' | 'gradient' | 'outline' | 'elevated';
   gradientColors?: string[];
   style?: ViewStyle;
-  scheme?: ColorScheme;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -16,32 +16,33 @@ export const Card: React.FC<CardProps> = ({
   variant = 'solid',
   gradientColors,
   style,
-  scheme = 'dark',
 }) => {
-  const themeColors = Colors[scheme];
+  const { colors, scheme } = useTheme();
 
   const getBaseStyle = () => {
     switch (variant) {
       case 'solid':
         return {
-          backgroundColor: themeColors.backgroundSecondary,
-          borderColor: themeColors.border,
+          backgroundColor: colors.backgroundSecondary,
+          borderColor: colors.border,
           borderWidth: 1,
         };
       case 'outline':
         return {
           backgroundColor: 'transparent',
-          borderColor: themeColors.border,
+          borderColor: colors.border,
           borderWidth: 1,
         };
       case 'elevated':
         return {
-          backgroundColor: themeColors.backgroundSecondary,
+          backgroundColor: colors.backgroundSecondary,
+          borderColor: colors.border,
+          borderWidth: 1,
           ...Platform.select({
             ios: {
-              shadowColor: '#000',
+              shadowColor: scheme === 'dark' ? '#000' : '#94A3B8',
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
+              shadowOpacity: scheme === 'dark' ? 0.25 : 0.15,
               shadowRadius: 8,
             },
             android: {

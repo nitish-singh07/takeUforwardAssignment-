@@ -4,19 +4,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
   LayoutChangeEvent,
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { Colors, Spacing, Radii, ColorScheme } from '../../constants/theme';
+import { Spacing, Radii } from '../../constants/theme';
 import { Typography } from './Typography';
+import { useTheme } from '../../context/ThemeContext';
 
 interface TabSwitchProps {
   options: string[];
   activeIndex?: number;
   onSelect?: (index: number) => void;
-  scheme?: ColorScheme;
   style?: ViewStyle;
 }
 
@@ -24,14 +23,12 @@ export const TabSwitch: React.FC<TabSwitchProps> = ({
   options,
   activeIndex: externalActiveIndex,
   onSelect,
-  scheme = 'dark',
   style,
 }) => {
   const [activeIndex, setActiveIndex] = useState(externalActiveIndex || 0);
   const [containerWidth, setContainerWidth] = useState(0);
   const [indicatorX] = useState(new Animated.Value(0));
-
-  const themeColors = Colors[scheme];
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (externalActiveIndex !== undefined) {
@@ -66,7 +63,10 @@ export const TabSwitch: React.FC<TabSwitchProps> = ({
       onLayout={onLayout}
       style={StyleSheet.flatten([
         styles.container,
-        { backgroundColor: themeColors.backgroundSecondary, borderColor: themeColors.border },
+        {
+          backgroundColor: colors.backgroundSecondary,
+          borderColor: colors.border,
+        },
         style,
       ])}
     >
@@ -74,13 +74,15 @@ export const TabSwitch: React.FC<TabSwitchProps> = ({
         style={[
           styles.indicator,
           {
-            width: tabWidth - 4, // 2px margin on each side
-            backgroundColor: themeColors.background,
+            width: tabWidth - 4,
+            backgroundColor: colors.background,
+            borderColor: colors.border,
+            borderWidth: 1,
             transform: [{ translateX: indicatorX }],
           },
         ]}
       />
-      
+
       {options.map((option, index) => (
         <TouchableOpacity
           key={index}
@@ -90,7 +92,6 @@ export const TabSwitch: React.FC<TabSwitchProps> = ({
         >
           <Typography
             variant="label"
-            scheme={scheme}
             color={activeIndex === index ? 'text' : 'textSecondary'}
             style={StyleSheet.flatten([
               styles.label,
