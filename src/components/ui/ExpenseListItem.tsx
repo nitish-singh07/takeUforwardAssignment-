@@ -10,7 +10,6 @@ import { getCategoryConfig } from '../../utils/categoryConfig';
 
 interface ExpenseListItemProps {
   title:        string;
-  subtitle?:    string;
   amount:       string;
   trend:        'increment' | 'decrement';
   /** Transaction timestamp (ms) — shown as formatted date. */
@@ -25,9 +24,9 @@ function formatDate(ts: number): string {
   const d = new Date(ts);
   const now = new Date();
 
-  // Today → "Today, 2:30 PM"
+  // Today → "Today"
   if (d.toDateString() === now.toDateString()) {
-    return 'Today, ' + d.toLocaleTimeString('default', { hour: '2-digit', minute: '2-digit' });
+    return 'Today';
   }
 
   // Yesterday → "Yesterday"
@@ -45,7 +44,6 @@ function formatDate(ts: number): string {
 
 export const ExpenseListItem: React.FC<ExpenseListItemProps> = ({
   title,
-  subtitle,
   amount,
   trend,
   timestamp,
@@ -78,13 +76,8 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = ({
       {/* Text block */}
       <View style={styles.textBlock}>
         <Typography variant="bodySemiBold">{title}</Typography>
-        {subtitle ? (
-          <Typography variant="caption" style={{ color: colors.textTertiary }}>
-            {subtitle}
-          </Typography>
-        ) : null}
         {timestamp ? (
-          <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: 1 }}>
+          <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: -1 }}>
             {formatDate(timestamp)}
           </Typography>
         ) : null}

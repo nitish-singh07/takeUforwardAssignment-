@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -6,6 +6,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Animated,
+  Keyboard,
+  Easing,
 } from 'react-native';
 import BottomSheet, {
   BottomSheetScrollView,
@@ -32,6 +35,10 @@ interface EditProfileSheetProps {
   onSave: () => void;
   /** Whether the save action is in progress. */
   loading: boolean;
+  /** Initial name to compare for changes. */
+  originalName: string;
+  /** Initial email to compare for changes. */
+  originalEmail: string;
 }
 
 export interface EditProfileSheetHandle {
@@ -59,6 +66,7 @@ const SheetInput: React.FC<SheetInputProps> = ({
   autoCapitalize = 'sentences',
 }) => {
   const { colors } = useTheme();
+  const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={inputStyles.group}>
@@ -72,12 +80,18 @@ const SheetInput: React.FC<SheetInputProps> = ({
       <View
         style={[
           inputStyles.inputWrapper,
-          { backgroundColor: colors.backgroundTertiary, borderColor: colors.border },
+          {
+            backgroundColor: colors.backgroundTertiary,
+            borderColor: isFocused ? colors.text : colors.border,
+            borderWidth: isFocused ? 1.5 : 1,
+          },
         ]}
       >
         <TextInput
           value={value}
           onChangeText={onChangeText}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
           placeholderTextColor={colors.textTertiary}
           style={{ flex: 1, color: colors.text, fontSize: 16 }}
@@ -118,11 +132,32 @@ const inputStyles = StyleSheet.create({
  * so the parent screen never touches BottomSheet internals directly.
  */
 export const EditProfileSheet = forwardRef<EditProfileSheetHandle, EditProfileSheetProps>(
-  ({ name, email, onNameChange, onEmailChange, onSave, loading }, ref) => {
+  ({ name, email, onNameChange, onEmailChange, onSave, loading, originalName, originalEmail }, ref) => {
     const { colors } = useTheme();
 
     const sheetRef    = useRef<BottomSheet>(null);
-    const snapPoints  = useMemo(() => ['65%'], []);
+    const snapPoints  = useMemo(() => ['75%'], []);
+
+    // ── Keyboard Animation ──
+    const headerVisibility = useRef(new Animated.Value(1)).current;
+
+    const animateHeader = (show: boolean) => {
+      Animated.timing(headerVisibility, {
+        toValue: show ? 1 : 0,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // Height animation needs JS driver
+      }).start();
+    };
+
+    useEffect(() => {
+      const showSub = Keyboard.addListener('keyboardDidShow', () => animateHeader(false));
+      const hideSub = Keyboard.addListener('keyboardDidHide', () => animateHeader(true));
+      return () => {
+        showSub.remove();
+        hideSub.remove();
+      };
+    }, []);
 
     // Expose open / close to the parent
     useImperativeHandle(ref, () => ({
@@ -130,7 +165,8 @@ export const EditProfileSheet = forwardRef<EditProfileSheetHandle, EditProfileSh
       close: () => sheetRef.current?.close(),
     }));
 
-    const isDisabled = !name.trim() || !email.trim();
+    const hasChanges = name.trim() !== originalName.trim() || email.trim() !== originalEmail.trim();
+    const isDisabled = !name.trim() || !email.trim() || !hasChanges;
 
     return (
       <BottomSheet
@@ -155,7 +191,22 @@ export const EditProfileSheet = forwardRef<EditProfileSheetHandle, EditProfileSh
         >
           <BottomSheetScrollView contentContainerStyle={styles.content}>
             {/* ── Header ── */}
-            <View style={styles.sheetHeader}>
+            <Animated.View
+              style={[
+                styles.sheetHeader,
+                {
+                  opacity: headerVisibility,
+                  maxHeight: headerVisibility.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 100],
+                  }),
+                  marginBottom: headerVisibility.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, Spacing['2xl']],
+                  }),
+                },
+              ]}
+            >
               <View>
                 <Typography variant="heading3">Edit Profile</Typography>
                 <Typography
@@ -177,7 +228,7 @@ export const EditProfileSheet = forwardRef<EditProfileSheetHandle, EditProfileSh
               >
                 <Ionicons name="close" size={18} color={colors.text} />
               </TouchableOpacity>
-            </View>
+            </Animated.View>
 
             {/* ── Form ── */}
             <View style={styles.form}>
@@ -231,7 +282,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing['2xl'],
+    overflow: 'hidden',
   },
   closeButton: {
     width: 34,

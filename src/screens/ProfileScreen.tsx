@@ -7,7 +7,6 @@
 
 import React, { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CentralModal }    from '../components/common/CentralModal';
 import { ThemePickerSheet } from '../components/common/ThemePickerSheet';
@@ -136,7 +135,7 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <>
-      <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -169,7 +168,7 @@ export const ProfileScreen: React.FC = () => {
             </Typography>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
 
       {/* Universal modal — info, success, error, confirm */}
       <CentralModal
@@ -187,6 +186,8 @@ export const ProfileScreen: React.FC = () => {
         ref={editSheetRef}
         name={editName}
         email={editEmail}
+        originalName={user.fullName ?? ''}
+        originalEmail={user.email ?? ''}
         onNameChange={setEditName}
         onEmailChange={setEditEmail}
         onSave={handleSaveProfile}

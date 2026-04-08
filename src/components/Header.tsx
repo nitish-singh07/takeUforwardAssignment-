@@ -17,7 +17,7 @@ import * as Haptic from '../utils/haptic';
  * so the transition is a native slide — no inline animation needed.
  */
 export const Header: React.FC = () => {
-  const insets     = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
 
@@ -31,10 +31,10 @@ export const Header: React.FC = () => {
       style={[
         styles.bar,
         {
-          backgroundColor:    colors.background,
-          borderBottomColor:  colors.border,
-          paddingTop:         insets.top + 10,
-          height:             75 + insets.top,
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
+          paddingTop: insets.top + 10,
+          height: 75 + insets.top,
         },
       ]}
     >
@@ -81,59 +81,58 @@ export const Header: React.FC = () => {
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing['2xl'],
     borderBottomWidth: 1,
   },
   logoRow: {
     flexDirection: 'row',
-    alignItems:    'center',
-    gap:           Spacing.md,
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   logoBox: {
-    width:          32,
-    height:         32,
-    borderRadius:   Radii.md,
+    width: 32,
+    height: 32,
+    borderRadius: Radii.md,
     justifyContent: 'center',
-    alignItems:     'center',
+    alignItems: 'center',
   },
   logoLetter: {
     fontWeight: '900',
   },
   wordmark: {
-    fontWeight:    '700',
+    fontWeight: '700',
     letterSpacing: -0.5,
   },
   actions: {
     flexDirection: 'row',
-    alignItems:    'center',
-    gap:           Spacing.md,
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   iconBtn: {
-    position:       'relative',
-    width:          40,
-    height:         40,
-    borderRadius:   Radii.full,
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: Radii.full,
     justifyContent: 'center',
-    alignItems:     'center',
-    borderWidth:    1,
+    alignItems: 'center',
   },
   badge: {
-    position:     'absolute',
-    top:          2,
-    right:        2,
-    width:        16,
-    height:       16,
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
     borderRadius: 8,
     justifyContent: 'center',
-    alignItems:     'center',
-    borderWidth:  2,
+    alignItems: 'center',
+    borderWidth: 2,
   },
   badgeText: {
-    fontSize:   9,
+    fontSize: 9,
     fontWeight: '900',
-    color:      '#fff',
+    color: '#fff',
   },
 });

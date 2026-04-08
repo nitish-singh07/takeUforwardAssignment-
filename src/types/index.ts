@@ -55,4 +55,7 @@ export type RootStackParamList = {
   Home: undefined;
   Balances: undefined;
   Profile: undefined;
+  Search: undefined;
+  AddTransaction: { transaction?: ExpenseRecord };
+  TransactionDetails: { transaction: ExpenseRecord };
 };

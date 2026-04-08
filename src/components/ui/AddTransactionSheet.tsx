@@ -28,16 +28,16 @@ import * as Haptics from 'expo-haptics';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface AddTransactionSheetProps {
-  onSuccess?:          () => void;
+  onSuccess?: () => void;
   initialTransaction?: ExpenseRecord | null;
 }
 
 // ─── Category chip ────────────────────────────────────────────────────────────
 
 interface CategoryChipProps {
-  name:       string;
-  isActive:   boolean;
-  onPress:    () => void;
+  name: string;
+  isActive: boolean;
+  onPress: () => void;
 }
 
 const CategoryChip: React.FC<CategoryChipProps> = ({ name, isActive, onPress }) => {
@@ -61,7 +61,7 @@ const CategoryChip: React.FC<CategoryChipProps> = ({ name, isActive, onPress }) 
       <Typography
         variant="caption"
         style={{
-          color:      isActive ? config.color : colors.textSecondary,
+          color: isActive ? config.color : colors.textSecondary,
           fontWeight: isActive ? '700' : '400',
           marginLeft: 4,
         }}
@@ -74,19 +74,19 @@ const CategoryChip: React.FC<CategoryChipProps> = ({ name, isActive, onPress }) 
 
 const chipStyles = StyleSheet.create({
   chip: {
-    flexDirection:  'row',
-    alignItems:     'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical:   Spacing.xs + 2,
-    borderRadius:   Radii.full,
-    borderWidth:    1,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radii.full,
+    borderWidth: 1,
   },
 });
 
 // ─── Date row ────────────────────────────────────────────────────────────────
 
 interface DateRowProps {
-  date:     Date;
+  date: Date;
   onChange: (date: Date) => void;
 }
 
@@ -134,12 +134,12 @@ const DateRow: React.FC<DateRowProps> = ({ date, onChange }) => {
 
 const dateStyles = StyleSheet.create({
   row: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    borderRadius:   Radii.lg,
-    borderWidth:    1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radii.lg,
+    borderWidth: 1,
     paddingHorizontal: Spacing.lg,
-    height:         52,
+    height: 52,
   },
 });
 
@@ -150,23 +150,23 @@ export const AddTransactionSheet = forwardRef<BottomSheet, AddTransactionSheetPr
     const isEdit = !!initialTransaction;
     const { colors } = useTheme();
 
-    const [type,     setType]     = useState<'income' | 'expense'>(
+    const [type, setType] = useState<'income' | 'expense'>(
       initialTransaction ? (initialTransaction.trend === 'increment' ? 'income' : 'expense') : 'expense'
     );
-    const [amount,   setAmount]   = useState(initialTransaction?.amount.toString() ?? '');
+    const [amount, setAmount] = useState(initialTransaction?.amount.toString() ?? '');
     const [category, setCategory] = useState(initialTransaction?.category ?? 'General');
-    const [note,     setNote]     = useState(initialTransaction?.description ?? '');
-    const [date,     setDate]     = useState(
+    const [note, setNote] = useState(initialTransaction?.description ?? '');
+    const [date, setDate] = useState(
       initialTransaction ? new Date(initialTransaction.timestamp) : new Date()
     );
 
     // Add custom category state
-    const [newCategoryName,  setNewCategoryName]  = useState('');
+    const [newCategoryName, setNewCategoryName] = useState('');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
 
     // Modal state
     const [modalVisible, setModalVisible] = useState(false);
-    const [modalConfig,  setModalConfig]  = useState({
+    const [modalConfig, setModalConfig] = useState({
       title: '', message: '', type: 'error' as any,
       onConfirm: undefined as (() => void) | undefined,
       confirmLabel: undefined as string | undefined,
@@ -186,14 +186,14 @@ export const AddTransactionSheet = forwardRef<BottomSheet, AddTransactionSheetPr
       addCategory, categories: userCategories, loading,
     } = useFinanceStore();
 
-    const { user }         = useAuthStore();
-    const triggerHaptic    = useSettingsStore(state => state.triggerHaptic);
-    const snapPoints       = useMemo(() => ['90%'], []);
+    const { user } = useAuthStore();
+    const triggerHaptic = useSettingsStore(state => state.triggerHaptic);
+    const snapPoints = useMemo(() => ['90%'], []);
 
     // All categories for current type
     const availableCategories = useMemo(() => {
       const defaults = getDefaultCategories(type);
-      const custom   = userCategories.filter(c => c.type === type).map(c => c.name);
+      const custom = userCategories.filter(c => c.type === type).map(c => c.name);
       return Array.from(new Set([...defaults, ...custom]));
     }, [type, userCategories]);
 
@@ -328,7 +328,7 @@ export const AddTransactionSheet = forwardRef<BottomSheet, AddTransactionSheetPr
                 AMOUNT
               </Typography>
               <View style={[styles.amountRow, { borderBottomColor: colors.border }]}>
-                <Typography variant="heading1" style={{ color: colors.textTertiary }}>$</Typography>
+                <Typography variant="heading1" style={{ color: colors.textTertiary }}>₹</Typography>
                 <TextInput
                   style={[styles.amountInput, { color: colors.text }]}
                   placeholder="0.00"
@@ -426,24 +426,24 @@ export const AddTransactionSheet = forwardRef<BottomSheet, AddTransactionSheetPr
   }
 );
 
-AddTransactionSheet.displayName = 'AddTransactionSheet';
+AddTransactionSheet.displayName = 'bAddTransactionSheet';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  flex:        { flex: 1 },
-  content:     { padding: Spacing['2xl'], gap: Spacing.xl, paddingBottom: 60 },
-  headerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tabSwitch:   { marginBottom: Spacing.sm },
-  inputGroup:  { gap: Spacing.sm },
-  label:       { letterSpacing: 1, fontSize: 10, textTransform: 'uppercase' },
-  labelRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  amountRow:   { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderBottomWidth: 1, paddingBottom: Spacing.xs },
+  flex: { flex: 1 },
+  content: { padding: Spacing['2xl'], gap: Spacing.xl, paddingBottom: 60 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  tabSwitch: { marginBottom: Spacing.sm },
+  inputGroup: { gap: Spacing.sm },
+  label: { letterSpacing: 1, fontSize: 10, textTransform: 'uppercase' },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderBottomWidth: 1, paddingBottom: Spacing.xs },
   amountInput: { flex: 1, fontSize: 40, fontWeight: '700', padding: 0 },
-  chipGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  addCatRow:   { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  addCatRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   addCatInput: { flex: 1, borderRadius: Radii.md, padding: Spacing.md },
-  addCatBtn:   { height: 48, paddingHorizontal: Spacing.xl },
-  noteInput:   { borderRadius: Radii.md, padding: Spacing.md, fontSize: 16, minHeight: 80, textAlignVertical: 'top' },
-  submit:      { marginTop: Spacing.md },
+  addCatBtn: { height: 48, paddingHorizontal: Spacing.xl },
+  noteInput: { borderRadius: Radii.md, padding: Spacing.md, fontSize: 16, minHeight: 80, textAlignVertical: 'top' },
+  submit: { marginTop: Spacing.md },
 });

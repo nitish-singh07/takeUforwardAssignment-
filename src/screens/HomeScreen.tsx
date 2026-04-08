@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +18,7 @@ import { useFinanceStore } from '../store/financeStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useNavigation } from '@react-navigation/native';
 import { ExpenseRecord } from '../types';
+import { formatCurrency, formatAmount } from '../utils/currency';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -82,13 +82,9 @@ const HeroCard: React.FC<HeroCardProps> = ({
             Net Balance
           </Typography>
           <View style={heroStyles.balanceRow}>
-            {!isPositive && (
-              <Typography style={heroStyles.balanceSign}>−</Typography>
-            )}
             <Typography style={heroStyles.balanceDollars}>
-              ${dollars}
+              {!isPositive ? '−' : ''}{formatCurrency(Math.abs(balance))}
             </Typography>
-            <Typography style={heroStyles.balanceCents}>.{cents}</Typography>
           </View>
         </View>
 
@@ -118,7 +114,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
               Income
             </Typography>
             <Typography variant="bodySemiBold" style={{ color: '#10b981' }}>
-              +${monthlyIncome.toLocaleString()}
+              +{formatCurrency(monthlyIncome)}
             </Typography>
           </View>
         </View>
@@ -132,7 +128,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
               Expenses
             </Typography>
             <Typography variant="bodySemiBold" style={{ color: '#ef4444' }}>
-              −${monthlyExpense.toLocaleString()}
+              −{formatCurrency(monthlyExpense)}
             </Typography>
           </View>
         </View>
@@ -149,7 +145,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
               variant="bodySemiBold"
               style={{ color: isPositive ? '#10b981' : '#ef4444' }}
             >
-              {isPositive ? '+' : '−'}${Math.abs(monthlyIncome - monthlyExpense).toLocaleString()}
+              {isPositive ? '+' : '−'}{formatCurrency(Math.abs(monthlyIncome - monthlyExpense))}
             </Typography>
           </View>
         </View>
@@ -377,15 +373,15 @@ export const HomeScreen: React.FC = () => {
     (navigation as any).navigate('AddTransaction');
   };
 
-  const handleEditPress = (tx: ExpenseRecord) => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    (navigation as any).navigate('AddTransaction', { transaction: tx });
+  const handlePress = (tx: ExpenseRecord) => {
+    triggerHaptic('selection');
+    (navigation as any).navigate('TransactionDetails', { transaction: tx });
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -484,11 +480,10 @@ export const HomeScreen: React.FC = () => {
                 <ExpenseListItem
                   key={tx.id}
                   title={tx.category}
-                  subtitle={tx.description || undefined}
-                  amount={(tx.trend === 'decrement' ? '−' : '+') + '$' + tx.amount.toLocaleString()}
+                  amount={formatAmount(tx.amount, tx.trend === 'increment')}
                   trend={tx.trend}
                   timestamp={tx.timestamp}
-                  onLongPress={() => handleEditPress(tx)}
+                  onPress={() => handlePress(tx)}
                 />
               ))
             )}
@@ -517,7 +512,7 @@ export const HomeScreen: React.FC = () => {
         <Ionicons name="add" size={30} color={colors.background} />
       </TouchableOpacity>
 
-    </SafeAreaView>
+    </View>
   );
 };
 

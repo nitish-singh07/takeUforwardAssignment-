@@ -1,244 +1,311 @@
-import React, { useState, useMemo } from 'react';
+/**
+ * WelcomeScreen — thin orchestrator.
+ *
+ * All UI is delegated to components in src/components/auth/.
+ * This file owns: state, validation logic, keyboard animation, submit flow.
+ */
+
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from 'react';
 import {
   View,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Animated,
+  Keyboard,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radii } from '../constants/theme';
+import { Spacing, Radii } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { Typography } from '../components/common/Typography';
-import { Button } from '../components/common/Button';
-import { Input } from '../components/common/Input';
-import { Card } from '../components/common/Card';
-import { TabSwitch } from '../components/common/TabSwitch';
+import { CentralModal } from '../components/common/CentralModal';
+import { WelcomeHero } from '../components/auth/WelcomeHero';
+import { AuthTabSwitch, AuthTab } from '../components/auth/AuthTabSwitch';
+import { AuthFormField, PasswordHintRow } from '../components/auth/AuthFormField';
+import { AuthSubmitButton } from '../components/auth/AuthSubmitButton';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
-import * as Haptics from 'expo-haptics';
 import { LoginSchema, SignupSchema } from '../utils/validation';
-import { CentralModal } from '../components/common/CentralModal';
+import * as Haptics from 'expo-haptics';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface FieldErrors {
+  fullName?: string;
+  email?:    string;
+  password?: string;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function extractErrors(
+  schema: typeof LoginSchema | typeof SignupSchema,
+  data:   Record<string, string | undefined>,
+): FieldErrors {
+  const result = (schema as any).safeParse(data);
+  if (result.success) return {};
+  const errors: FieldErrors = {};
+  for (const issue of result.error.issues) {
+    const field = issue.path[0] as keyof FieldErrors;
+    if (!errors[field]) errors[field] = issue.message;
+  }
+  return errors;
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const WelcomeScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(0); // 0: Sign In, 1: Sign Up
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  
-  // Modal State
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ title: '', message: '', type: 'error' as any });
-
-  const { login, signup, loading, clearError } = useAuthStore();
   const { colors } = useTheme();
-  const triggerHaptic = useSettingsStore(state => state.triggerHaptic);
+  const { login, signup, loading, clearError } = useAuthStore();
+  const triggerHaptic = useSettingsStore(s => s.triggerHaptic);
 
-  const showError = (title: string, message: string) => {
-    setModalConfig({ title, message, type: 'error' });
-    setModalVisible(true);
+  // ── Tab ──────────────────────────────────────────────────────────────────────
+
+  const [tab, setTab] = useState<AuthTab>('signin');
+
+  const switchTab = (newTab: AuthTab) => {
+    setTab(newTab);
+    setFullName(''); setEmail(''); setPassword('');
+    setFieldErrors({}); setSubmitted(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  // ── Fields ───────────────────────────────────────────────────────────────────
+
+  const [fullName, setFullName] = useState('');
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+
+  // ── Validation ───────────────────────────────────────────────────────────────
+
+  const [submitted,   setSubmitted]   = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  const validate = useCallback((): FieldErrors => {
+    const data = tab === 'signin'
+      ? { email, password }
+      : { fullName, email, password };
+    const schema = tab === 'signin' ? LoginSchema : SignupSchema;
+    return extractErrors(schema, data);
+  }, [tab, fullName, email, password]);
+
+  // Live-revalidate after first submit attempt
+  useEffect(() => {
+    if (submitted) setFieldErrors(validate());
+  }, [fullName, email, password, submitted, validate]);
+
+  const isFormValid = Object.keys(validate()).length === 0;
+
+  // ── Modal ────────────────────────────────────────────────────────────────────
+
+  const [modal, setModal] = useState({ visible: false, title: '', message: '' });
+
+  const showModal = (title: string, message: string) => {
+    setModal({ visible: true, title, message });
     triggerHaptic(Haptics.NotificationFeedbackType.Error);
   };
 
-  const handleAction = async () => {
-    // Validation with Zod (as a fallback)
-    if (activeTab === 1) {
-      const result = SignupSchema.safeParse({ fullName, email, password });
-      if (!result.success) {
-        showError('Validation Error', result.error.issues[0].message);
-        return;
-      }
-    } else {
-      const result = LoginSchema.safeParse({ email, password });
-      if (!result.success) {
-        showError('Validation Error', result.error.issues[0].message);
-        return;
-      }
-    }
-
-    let result;
-    if (activeTab === 0) {
-      result = await login(email, password);
-    } else {
-      result = await signup(fullName, email, password);
-    }
-
-    if (!result.success) {
-      showError('Authentication Failed', result.error || 'An unexpected error occurred.');
-    }
-  };
-
   const closeModal = () => {
-    setModalVisible(false);
+    setModal(m => ({ ...m, visible: false }));
     clearError();
   };
 
-  // Form Validation State for UI disabling
-  const isFormValid = useMemo(() => {
-    if (activeTab === 0) {
-      return LoginSchema.safeParse({ email, password }).success;
+  // ── Input refs for focus chain ────────────────────────────────────────────────
+
+  const emailRef    = useRef<TextInput | null>(null);
+  const passwordRef = useRef<TextInput | null>(null);
+
+  // ── Submit ────────────────────────────────────────────────────────────────────
+
+  const handleSubmit = async () => {
+    setSubmitted(true);
+    const errors = validate();
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
     }
-    return SignupSchema.safeParse({ fullName, email, password }).success;
-  }, [activeTab, email, password, fullName]);
+
+    Keyboard.dismiss();
+
+    const result = tab === 'signin'
+      ? await login(email.trim(), password)
+      : await signup(fullName.trim(), email.trim(), password);
+
+    if (!result.success) {
+      showModal(
+        tab === 'signin' ? 'Sign In Failed' : 'Sign Up Failed',
+        result.error ?? 'An unexpected error occurred. Please try again.',
+      );
+    }
+  };
+
+  // ── Keyboard animation ────────────────────────────────────────────────────────
+
+  const heroVisibility = useRef(new Animated.Value(1)).current;
+
+  const animateHero = (show: boolean) => {
+    Animated.parallel([
+      Animated.timing(heroVisibility, {
+        toValue:         show ? 1 : 0,
+        duration:        show ? 300 : 250,
+        easing:          Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => animateHero(false));
+    const hide = Keyboard.addListener('keyboardDidHide', () => animateHero(true));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
       <CentralModal
-        visible={modalVisible}
+        visible={modal.visible}
         onClose={closeModal}
-        title={modalConfig.title}
-        message={modalConfig.message}
-        type={modalConfig.type}
+        title={modal.title}
+        message={modal.message}
+        type="error"
       />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        style={styles.flex}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Logo Section */}
-          <View style={styles.header}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.text }]}>
-              <Typography variant="heading2" color="textInverse" style={styles.logoText}>
-                P
-              </Typography>
-            </View>
-            <View style={styles.headerInfo}>
-              <Typography variant="heading1" style={styles.welcomeTitle}>
-                Welcome to PayU
-              </Typography>
-              <Typography variant="body" color="textSecondary" style={styles.subTitle}>
-                Send money globally with the real exchange rate
-              </Typography>
-            </View>
-          </View>
+          {/* Hero — collapses when keyboard opens */}
+          <WelcomeHero visibility={heroVisibility} />
 
-          {/* Form Card */}
-          <Card variant="solid" style={styles.formCard}>
-            <Typography variant="heading3" style={styles.cardTitle}>
-              Get started
-            </Typography>
-            <Typography variant="bodySmall" color="textSecondary" style={styles.cardSubTitle}>
-              Sign in to your account or create a new one
-            </Typography>
+          {/* Form card */}
+          <View style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
 
-            <TabSwitch
-              options={['Sign In', 'Sign Up']}
-              activeIndex={activeTab}
-              onSelect={setActiveTab}
-              style={styles.tabSwitch}
-            />
+            <AuthTabSwitch active={tab} onChange={switchTab} />
 
-            {activeTab === 1 && (
-              <Input
+            {/* Full name — Sign Up only */}
+            {tab === 'signup' && (
+              <AuthFormField
                 label="Full Name"
                 placeholder="Enter your full name"
-                autoCapitalize="words"
                 value={fullName}
                 onChangeText={setFullName}
+                autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                error={fieldErrors.fullName}
+                autoFocus
               />
             )}
 
-            <Input
-              label="Email"
-              placeholder="Enter your email"
-              autoCapitalize="none"
-              keyboardType="email-address"
+            <AuthFormField
+              label="Email Address"
+              placeholder="you@example.com"
               value={email}
               onChangeText={setEmail}
+              keyboardType="email-address"
+              returnKeyType="next"
+              inputRef={emailRef}
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              error={fieldErrors.email}
+              autoFocus={tab === 'signin'}
             />
 
-            <Input
+            <AuthFormField
               label="Password"
               placeholder="Enter your password"
-              isPassword
               value={password}
               onChangeText={setPassword}
+              isPassword
+              returnKeyType="done"
+              inputRef={passwordRef}
+              onSubmitEditing={handleSubmit}
+              error={fieldErrors.password}
             />
 
-            {activeTab === 0 && (
-              <Typography variant="caption" color="text" style={styles.forgotPassword}>
-                Forgot password?
-              </Typography>
+            {/* Password requirements — always visible on Sign Up */}
+            {tab === 'signup' && <PasswordHintRow value={password} />}
+
+            {/* Forgot password — Sign In only */}
+            {tab === 'signin' && (
+              <TouchableOpacity style={styles.forgotRow} activeOpacity={0.7}>
+              <Typography variant="caption" style={{ color: colors.text, fontWeight: '600' }}>
+                  Forgot password?
+                </Typography>
+              </TouchableOpacity>
             )}
 
-            <Button
-              label={activeTab === 0 ? 'Sign In' : 'Sign Up'}
-              variant={isFormValid ? 'primary' : 'secondary'}
-              onPress={handleAction}
+            <AuthSubmitButton
+              label={tab === 'signin' ? 'Sign In' : 'Create Account'}
+              onPress={handleSubmit}
               loading={loading}
-              disabled={!isFormValid && !loading}
-              style={styles.actionButton}
+              enabled={isFormValid}
             />
-          </Card>
+
+            {/* Switch tab hint */}
+            <View style={styles.switchHint}>
+              <Typography variant="caption" style={{ color: colors.textTertiary }}>
+                {tab === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+              </Typography>
+              <TouchableOpacity
+                onPress={() => switchTab(tab === 'signin' ? 'signup' : 'signin')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Typography variant="caption" style={{ color: colors.text, fontWeight: '700' }}>
+                  {tab === 'signin' ? 'Sign Up' : 'Sign In'}
+                </Typography>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background, // overridden by inline in JSX
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: Spacing['2xl'],
-    flexGrow: 1,
+  screen: { flex: 1 },
+  flex:   { flex: 1 },
+  scroll: {
+    flexGrow:       1,
     justifyContent: 'center',
+    padding:        Spacing.lg,
+    paddingBottom:  48,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 48,
+  card: {
+    borderRadius: Radii['2xl'],
+    borderWidth:  1,
+    padding:      Spacing.xl,
   },
-  logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: Radii.lg,
-    backgroundColor: 'transparent', // overridden by inline in JSX
+  forgotRow: {
+    alignSelf:    'flex-end',
+    marginTop:    Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  switchHint: {
+    flexDirection:  'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  logoText: {
-    fontWeight: '900',
-  },
-  headerInfo: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  welcomeTitle: {
-    textAlign: 'center',
-  },
-  subTitle: {
-    textAlign: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  formCard: {
-    backgroundColor: 'transparent', // overridden by inline in JSX
-    padding: Spacing.xl,
-  },
-  cardTitle: {
-    marginBottom: 4,
-  },
-  cardSubTitle: {
-    marginBottom: Spacing.xl,
-  },
-  tabSwitch: {
-    marginBottom: Spacing.xl,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.lg,
-    fontWeight: '600',
-  },
-  actionButton: {
-    marginTop: Spacing.md,
+    alignItems:     'center',
+    marginTop:      Spacing.xl,
+    gap:            2,
   },
 });

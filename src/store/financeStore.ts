@@ -3,6 +3,7 @@ import { ExpenseRecord } from '../types';
 import { TransactionRepository } from '../database/TransactionRepository';
 import { UserRepository } from '../database/UserRepository';
 import { Category, CategoryRepository } from '../database/CategoryRepository';
+import { useAuthStore } from './authStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,5 +149,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   recalculateUserMetrics: async (userId) => {
     const { income, expense } = await TransactionRepository.getUserMetrics(userId);
     await UserRepository.updateMetrics(userId, income - expense, expense);
+    // Sync the authStore to update balance in UI globally
+    await useAuthStore.getState().syncProfile();
   },
 }));

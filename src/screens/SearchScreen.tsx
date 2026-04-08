@@ -26,6 +26,7 @@ import { useFinanceStore } from '../store/financeStore';
 import { TransactionRepository } from '../database/TransactionRepository';
 import { getCategoryConfig, getDefaultCategories } from '../utils/categoryConfig';
 import { ExpenseRecord } from '../types';
+import { formatAmount, formatCurrency } from '../utils/currency';
 import * as Haptics from 'expo-haptics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -340,20 +341,25 @@ const FilterChip: React.FC<{
   label: string; isActive: boolean; color?: string; onPress: () => void;
 }> = ({ label, isActive, color, onPress }) => {
   const { colors } = useTheme();
-  const accent = color ?? colors.text;
+  // We'll use a filled style for active chips now
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
       style={[
         chipStyles.chip,
-        { borderColor: isActive ? accent : colors.border },
-        isActive && { backgroundColor: accent + '18' },
+        {
+          borderColor:     isActive ? colors.text : colors.border,
+          backgroundColor: isActive ? colors.text : 'transparent',
+        },
       ]}
     >
       <Typography
         variant="caption"
-        style={{ color: isActive ? accent : colors.textSecondary, fontWeight: isActive ? '700' : '400' }}
+        style={{
+          color:      isActive ? colors.background : colors.textSecondary,
+          fontWeight: isActive ? '700' : '400',
+        }}
       >
         {label}
       </Typography>
@@ -390,6 +396,7 @@ export const SearchScreen: React.FC = () => {
   const [showRangeModal, setShowRangeModal] = useState(false);
   const [results,        setResults]        = useState<ExpenseRecord[]>([]);
   const [searching,      setSearching]      = useState(false);
+  const [isFocused,      setIsFocused]      = useState(false);
 
   const inputRef = useRef<TextInput>(null);
 
@@ -445,10 +452,10 @@ export const SearchScreen: React.FC = () => {
   const renderItem = ({ item }: { item: ExpenseRecord }) => (
     <ExpenseListItem
       title={item.category}
-      subtitle={item.description || undefined}
-      amount={(item.trend === 'decrement' ? '−' : '+') + '$' + item.amount.toLocaleString()}
+      amount={formatAmount(item.amount, item.trend === 'increment')}
       trend={item.trend}
       timestamp={item.timestamp}
+      onPress={() => (navigation as any).navigate('TransactionDetails', { transaction: item })}
     />
   );
 
@@ -486,8 +493,17 @@ export const SearchScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
 
-          <View style={[styles.inputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-            <Ionicons name="search-outline" size={18} color={colors.textTertiary} style={{ marginLeft: Spacing.md }} />
+          <View
+            style={[
+              styles.inputWrapper,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: isFocused ? colors.text : colors.border,
+                borderWidth: isFocused ? 1.5 : 1,
+              }
+            ]}
+          >
+            <Ionicons name="search-outline" size={18} color={isFocused ? colors.text : colors.textTertiary} style={{ marginLeft: Spacing.md }} />
             <TextInput
               ref={inputRef}
               style={[styles.searchInput, { color: colors.text }]}
@@ -495,6 +511,8 @@ export const SearchScreen: React.FC = () => {
               placeholderTextColor={colors.textTertiary}
               value={query}
               onChangeText={setQuery}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               returnKeyType="search"
               autoCorrect={false}
             />
@@ -585,12 +603,12 @@ export const SearchScreen: React.FC = () => {
             <View style={styles.summaryTotals}>
               {incomeTotal > 0 && (
                 <Typography variant="caption" style={{ color: '#10b981', fontWeight: '700' }}>
-                  +${incomeTotal.toLocaleString()}
+                  +{formatCurrency(incomeTotal)}
                 </Typography>
               )}
               {expenseTotal > 0 && (
                 <Typography variant="caption" style={{ color: '#ef4444', fontWeight: '700' }}>
-                  −${expenseTotal.toLocaleString()}
+                  −{formatCurrency(expenseTotal)}
                 </Typography>
               )}
             </View>

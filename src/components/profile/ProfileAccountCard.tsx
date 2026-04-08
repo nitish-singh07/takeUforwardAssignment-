@@ -48,9 +48,6 @@ export const ProfileAccountCard: React.FC<ProfileAccountCardProps> = ({
         <SettingsRow
           icon="log-out-outline"
           label="Sign Out"
-          iconBoxColor={colors.warning + '1A'}
-          iconColor={colors.warning}
-          labelColor={colors.warning}
           onPress={onSignOutPress}
         />
 

@@ -9,20 +9,21 @@
  *  4. Toggle design: Spend = green pill, Income = blue pill (both coloured when active).
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Switch,
   ScrollView,
   Platform,
   KeyboardAvoidingView,
   Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -35,15 +36,18 @@ import { useAuthStore } from '../store/authStore';
 import { useFinanceStore } from '../store/financeStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { getCategoryConfig } from '../utils/categoryConfig';
+import { RootStackParamList } from '../types';
 import * as Haptics from 'expo-haptics';
+
+type AddTransactionRouteProp = RouteProp<RootStackParamList, 'AddTransaction'>;
 
 // ─── Payment methods ──────────────────────────────────────────────────────────
 
 const PAYMENT_METHODS = [
-  { key: 'cash', label: 'Cash', icon: 'cash-outline'           as const },
-  { key: 'upi',  label: 'UPI',  icon: 'phone-portrait-outline' as const },
-  { key: 'card', label: 'Card', icon: 'card-outline'           as const },
-  { key: 'bank', label: 'Bank', icon: 'business-outline'       as const },
+  { key: 'cash', label: 'Cash', icon: 'cash-outline' as const },
+  { key: 'upi', label: 'UPI', icon: 'phone-portrait-outline' as const },
+  { key: 'card', label: 'Card', icon: 'card-outline' as const },
+  { key: 'bank', label: 'Bank', icon: 'business-outline' as const },
 ];
 
 // ─── Type toggle ──────────────────────────────────────────────────────────────
@@ -83,8 +87,7 @@ const TypeToggle: React.FC<TypeToggleProps> = ({ isSpend, onChange }) => {
 
   return (
     <View style={pillStyles.row}>
-      <Pill active={isSpend}  label="Spend"  activeColor="#1e4d30" activeText="#6fcf97" />
-      <View style={[pillStyles.sep, { backgroundColor: colors.border }]} />
+      <Pill active={isSpend} label="Spend" activeColor="#1e4d30" activeText="#6fcf97" />
       <Pill active={!isSpend} label="Income" activeColor="#1a3a5c" activeText="#56b4d3" />
     </View>
   );
@@ -92,19 +95,20 @@ const TypeToggle: React.FC<TypeToggleProps> = ({ isSpend, onChange }) => {
 
 const pillStyles = StyleSheet.create({
   row: {
-    flexDirection:   'row',
-    justifyContent:  'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingVertical:   Spacing.md,
-    gap:             Spacing.sm,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
+    gap: Spacing.sm,
   },
   pill: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.sm + 2,
-    borderRadius:      Radii.full,
-    borderWidth:       1,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: Radii.full,
+    borderWidth: 1,
   },
   sep: { width: 1, marginVertical: Spacing.xs, marginHorizontal: Spacing.sm },
 });
@@ -112,31 +116,43 @@ const pillStyles = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const AddTransactionScreen: React.FC = () => {
-  const navigation    = useNavigation();
-  const { colors }    = useTheme();
-  const { user }      = useAuthStore();
-  const { addTransaction, loading } = useFinanceStore();
+  const navigation = useNavigation();
+  const route = useRoute<AddTransactionRouteProp>();
+  const editRecord = route.params?.transaction;
+  
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const { user } = useAuthStore();
+  const { addTransaction, updateTransaction, loading } = useFinanceStore();
   const triggerHaptic = useSettingsStore(s => s.triggerHaptic);
 
-  // Form state
-  const [isSpend,       setIsSpend]       = useState(true);
-  const [amount,        setAmount]        = useState('');
-  const [merchant,      setMerchant]      = useState('');
-  const [note,          setNote]          = useState('');
-  const [category,      setCategory]      = useState('Food');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [date,          setDate]          = useState(new Date());
-  const [showPicker,    setShowPicker]    = useState(false);
-  const [showPayMenu,   setShowPayMenu]   = useState(false);
-  const [amountErr,     setAmountErr]     = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
+  // Form state - initialized with editRecord if present
+  const [isSpend, setIsSpend] = useState(editRecord ? editRecord.trend === 'decrement' : true);
+  const [amount, setAmount] = useState(editRecord ? String(editRecord.amount) : '');
+  const [merchant, setMerchant] = useState(editRecord ? editRecord.merchant || '' : '');
+  const [note, setNote] = useState(editRecord ? editRecord.description || '' : '');
+  const [category, setCategory] = useState(editRecord ? editRecord.category : 'Food');
+  const [paymentMethod, setPaymentMethod] = useState(editRecord ? editRecord.payment_method || 'cash' : 'cash');
+  const [date, setDate] = useState(editRecord ? new Date(editRecord.timestamp) : new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const [showPayMenu, setShowPayMenu] = useState(false);
+  const [amountErr, setAmountErr] = useState('');
 
   const [modalCfg, setModalCfg] = useState({
     visible: false, title: '', message: '', type: 'error' as any,
   });
 
   const catSheetRef = useRef<BottomSheet | null>(null);
-  const catConfig   = getCategoryConfig(category);
-  const payMethod   = PAYMENT_METHODS.find(p => p.key === paymentMethod) ?? PAYMENT_METHODS[0];
+  const catConfig = getCategoryConfig(category);
+  const payMethod = PAYMENT_METHODS.find(p => p.key === paymentMethod) ?? PAYMENT_METHODS[0];
 
   // When switching type also reset category to first of that type
   const handleTypeChange = (spend: boolean) => {
@@ -158,11 +174,13 @@ export const AddTransactionScreen: React.FC = () => {
   };
 
   const formatDate = (d: Date) => {
-    const now  = new Date();
+    const now = new Date();
     const yest = new Date(); yest.setDate(now.getDate() - 1);
-    if (d.toDateString() === now.toDateString()) return 'Today';
-    if (d.toDateString() === yest.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (d.toDateString() === now.toDateString())
+      return 'Today';
+    if (d.toDateString() === yest.toDateString())
+      return 'Yesterday';
+    return d.toLocaleDateString('default', { day: 'numeric', month: 'short' });
   };
 
   // ── Validation & save ──────────────────────────────────────────────────────
@@ -181,22 +199,38 @@ export const AddTransactionScreen: React.FC = () => {
     if (!validate() || !user) return;
     triggerHaptic('selection');
 
-    const success = await addTransaction(
-      user.id,
-      isSpend ? 'expense' : 'income',
-      category,
-      parseFloat(amount),
-      note || undefined,
-      date.getTime(),
-      merchant || undefined,
-      paymentMethod,
-    );
+    let success = false;
+    if (editRecord) {
+      // Logic for editing
+      success = await updateTransaction(
+        editRecord.id,
+        user.id,
+        isSpend ? 'expense' : 'income',
+        category,
+        parseFloat(amount),
+        note || undefined
+      );
+    } else {
+      // Logic for adding new
+      success = await addTransaction(
+        user.id,
+        isSpend ? 'expense' : 'income',
+        category,
+        parseFloat(amount),
+        note || undefined,
+        date.getTime(),
+        merchant || undefined,
+        paymentMethod,
+      );
+    }
 
     if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (addAnother) {
+      if (addAnother && !editRecord) {
         setAmount(''); setMerchant(''); setNote(''); setAmountErr('');
       } else {
+        // If we were editing, we should probably go back to the details screen
+        // which will refresh its data or we just go back to the list.
         navigation.goBack();
       }
     } else {
@@ -211,22 +245,27 @@ export const AddTransactionScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[styles.screen, { backgroundColor: colors.background }]}
     >
-      <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
-
+      <View style={styles.flex}>
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { 
+          borderBottomColor: colors.border,
+          paddingTop: insets.top + 10,
+          height: 65 + insets.top,
+        }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.headerIconBtn}
           >
             <Ionicons name="arrow-back" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
-          <Typography variant="body" style={{ color: colors.textSecondary }}>
-            Add a transaction
+          <Typography variant="body" style={{ color: colors.textSecondary, fontWeight: '600' }}>
+            {editRecord ? 'Edit Transaction' : 'New Transaction'}
           </Typography>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.headerIconBtn}
           >
             <Ionicons name="close" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -245,7 +284,7 @@ export const AddTransactionScreen: React.FC = () => {
 
             <Typography
               variant="caption"
-                          style={StyleSheet.flatten([styles.cardLabel, { color: colors.textTertiary }])}
+              style={StyleSheet.flatten([styles.cardLabel, { color: colors.textTertiary }])}
             >
               {isSpend ? 'Amount spent' : 'Amount received'}
             </Typography>
@@ -265,11 +304,7 @@ export const AddTransactionScreen: React.FC = () => {
                 autoFocus
                 returnKeyType="next"
               />
-              <Ionicons
-                name={isSpend ? 'arrow-up-circle-outline' : 'arrow-down-circle-outline'}
-                size={22}
-                color={isSpend ? '#ef4444' : '#22c55e'}
-              />
+              <Ionicons name="arrow-up-circle-outline" size={22} color={colors.textTertiary} />
             </View>
 
             {/* Inline error */}
@@ -388,6 +423,19 @@ export const AddTransactionScreen: React.FC = () => {
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
+
+              <Typography
+                variant="caption"
+                style={{ color: 'rgba(255,255,255,0.5)', marginRight: Spacing.sm }}
+              >
+                {isSpend ? 'Expense' : 'Income'}
+              </Typography>
+              <Switch
+                value={isSpend}
+                onValueChange={v => { handleTypeChange(v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                trackColor={{ false: '#2a4a7a', true: '#2d5a3d' }}
+                thumbColor="#fff"
+              />
             </View>
 
             {showPayMenu && (
@@ -450,17 +498,26 @@ export const AddTransactionScreen: React.FC = () => {
         </ScrollView>
 
         {/* ── Action bar ── */}
-        <View style={[styles.actionBar, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            style={styles.saveAnotherBtn}
-            onPress={() => handleSave(true)}
-            disabled={loading}
-            activeOpacity={0.7}
-          >
-            <Typography variant="bodySemiBold" style={{ color: colors.textSecondary }}>
-              Save & add another
-            </Typography>
-          </TouchableOpacity>
+        <View style={[
+          styles.actionBar, 
+          { 
+            borderTopColor: colors.border, 
+            backgroundColor: colors.background,
+            paddingBottom: keyboardVisible ? Spacing.md : insets.bottom + Spacing.md
+          }
+        ]}>
+          {!editRecord && (
+            <TouchableOpacity
+              style={styles.saveAnotherBtn}
+              onPress={() => handleSave(true)}
+              disabled={loading}
+              activeOpacity={0.7}
+            >
+              <Typography variant="bodySemiBold" style={{ color: colors.textSecondary }}>
+                Save & add another
+              </Typography>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             onPress={() => handleSave(false)}
@@ -476,13 +533,13 @@ export const AddTransactionScreen: React.FC = () => {
             >
               <Ionicons name="checkmark" size={18} color={isSpend ? '#6fcf97' : '#56b4d3'} />
               <Typography variant="bodySemiBold" style={{ color: '#fff', marginLeft: 6 }}>
-                Save
+                {editRecord ? 'Update' : 'Save'}
               </Typography>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-      </SafeAreaView>
+      </View>
 
       {/* Category picker — shows only income or expense categories */}
       <CategoryPickerSheet
@@ -506,153 +563,159 @@ export const AddTransactionScreen: React.FC = () => {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen:  { flex: 1 },
-  flex:    { flex: 1 },
+  screen: { flex: 1 },
+  flex: { flex: 1 },
   header: {
-    flexDirection:     'row',
-    justifyContent:    'space-between',
-    alignItems:        'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.md,
     borderBottomWidth: 1,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 40 },
   card: {
     borderRadius: Radii.xl,
-    borderWidth:  1,
-    overflow:     'hidden',
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   cardLabel: {
     paddingHorizontal: Spacing.xl,
-    paddingTop:        Spacing.lg,
-    paddingBottom:     Spacing.sm,
-    letterSpacing:     0.4,
-    textTransform:     'uppercase',
-    fontSize:          10,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    fontSize: 10,
   },
   amountRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingBottom:     Spacing.md,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 2,
-    gap:               Spacing.sm,
+    gap: Spacing.sm,
   },
   amountInput: {
-    flex:        1,
-    fontSize:    32,
-    fontWeight:  '700',
-    padding:     0,
+    flex: 1,
+    fontSize: 32,
+    fontWeight: '700',
+    padding: 0,
     letterSpacing: -0.5,
   },
   errorRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingTop:        Spacing.xs + 2,
-    paddingBottom:     Spacing.xs,
+    paddingTop: Spacing.xs + 2,
+    paddingBottom: Spacing.xs,
   },
   sep: { height: 1, marginHorizontal: Spacing.xl },
   infoRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.lg,
-    gap:               Spacing.sm,
+    paddingVertical: Spacing.lg,
+    gap: Spacing.sm,
   },
   inlineInput: {
-    flex:      1,
-    fontSize:  15,
+    flex: 1,
+    fontSize: 15,
     textAlign: 'right',
-    padding:   0,
+    padding: 0,
   },
   notesRow: {
-    flexDirection:     'row',
-    alignItems:        'flex-start',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.lg,
-    gap:               Spacing.md,
+    paddingVertical: Spacing.lg,
+    gap: Spacing.md,
   },
   notesInput: {
-    flex:      1,
-    fontSize:  15,
-    padding:   0,
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
     maxHeight: 80,
   },
   iosPickerCard: {
     borderRadius: Radii.xl,
-    borderWidth:  1,
-    overflow:     'hidden',
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   iosPickerHeader: {
-    flexDirection:     'row',
-    justifyContent:    'space-between',
-    alignItems:        'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.md,
+    paddingVertical: Spacing.md,
   },
   // Payment
   payCard: {
     borderRadius: Radii.xl,
-    borderWidth:  1,
-    overflow:     'hidden',
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   payRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.lg,
-    gap:               Spacing.md,
+    paddingVertical: Spacing.lg,
+    gap: Spacing.md,
   },
   payIconBox: {
-    width:          38,
-    height:         38,
-    borderRadius:   Radii.lg,
+    width: 38,
+    height: 38,
+    borderRadius: Radii.lg,
     justifyContent: 'center',
-    alignItems:     'center',
+    alignItems: 'center',
   },
   payMethodBtn: {
     flexDirection: 'row',
-    alignItems:    'center',
+    alignItems: 'center',
   },
-  payDropdown:  { borderTopWidth: 1 },
+  payDropdown: { borderTopWidth: 1 },
   payOption: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.md,
+    paddingVertical: Spacing.md,
   },
   // Category
   catCard: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    borderRadius:      Radii.xl,
-    borderWidth:       1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radii.xl,
+    borderWidth: 1,
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.lg,
+    paddingVertical: Spacing.lg,
   },
   catIconBox: {
-    width:          38,
-    height:         38,
-    borderRadius:   Radii.lg,
+    width: 38,
+    height: 38,
+    borderRadius: Radii.lg,
     justifyContent: 'center',
-    alignItems:     'center',
+    alignItems: 'center',
   },
   // Actions
   actionBar: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.lg,
-    borderTopWidth:    1,
-    gap:               Spacing.lg,
+    paddingVertical: Spacing.lg,
+    borderTopWidth: 1,
+    gap: Spacing.lg,
   },
   saveAnotherBtn: { flex: 1, alignItems: 'center' },
-  saveBtn:        { borderRadius: Radii.xl, overflow: 'hidden' },
+  saveBtn: { borderRadius: Radii.xl, overflow: 'hidden' },
   saveGrad: {
-    flexDirection:     'row',
-    alignItems:        'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical:   Spacing.md + 2,
+    paddingVertical: Spacing.md + 2,
   },
 });

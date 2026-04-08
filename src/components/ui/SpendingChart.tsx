@@ -16,6 +16,8 @@ import { Typography } from '../common/Typography';
 import { useTheme } from '../../context/ThemeContext';
 import { WeeklyDataPoint } from '../../store/financeStore';
 import { Spacing, Radii } from '../../constants/theme';
+import { formatChartY, formatCurrency } from '../../utils/currency';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -35,14 +37,6 @@ interface SpendingChartProps {
   periodLabel:     string;  // e.g. "Week of 7 Apr" or "April 2026"
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatY(label: string): string {
-  const val = parseFloat(label);
-  if (isNaN(val)) return label;
-  if (val >= 1000) return `$${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k`;
-  return `$${val}`;
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -145,7 +139,7 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
           </Typography>
         </View>
       ) : (
-        <View style={styles.chartWrapper}>
+        <View key={data.map(d => `${d.income}-${d.expense}`).join(',')} style={styles.chartWrapper}>
           <BarChart
             data={barData}
             width={chartWidth}
@@ -157,7 +151,7 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
             yAxisTextStyle={{ color: colors.textTertiary, fontSize: 10 }}
             yAxisColor={colors.border}
             yAxisThickness={1}
-            formatYLabel={formatY}
+            formatYLabel={formatChartY}
             // X-axis
             xAxisColor={colors.border}
             xAxisThickness={1}
@@ -189,7 +183,7 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
             {period === 'weekly' ? 'Week Income' : 'Month Income'}
           </Typography>
           <Typography variant="bodySemiBold" style={{ color: INCOME_COLOR }}>
-            ${periodIncome.toLocaleString()}
+            {formatCurrency(periodIncome)}
           </Typography>
         </View>
 
@@ -200,7 +194,7 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
             {period === 'weekly' ? 'Week Expense' : 'Month Expense'}
           </Typography>
           <Typography variant="bodySemiBold" style={{ color: EXPENSE_COLOR }}>
-            ${periodExpense.toLocaleString()}
+            {formatCurrency(periodExpense)}
           </Typography>
         </View>
 
@@ -212,7 +206,7 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
             variant="bodySemiBold"
             style={{ color: periodIncome - periodExpense >= 0 ? INCOME_COLOR : EXPENSE_COLOR }}
           >
-            {periodIncome - periodExpense >= 0 ? '+' : ''}${(periodIncome - periodExpense).toLocaleString()}
+            {periodIncome - periodExpense >= 0 ? '+' : '−'}{formatCurrency(Math.abs(periodIncome - periodExpense))}
           </Typography>
         </View>
       </View>
