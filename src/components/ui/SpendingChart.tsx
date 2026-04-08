@@ -55,7 +55,8 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
 }) => {
   const { colors, scheme } = useTheme();
   const screenWidth        = Dimensions.get('window').width;
-  const chartWidth         = screenWidth - Spacing['2xl'] * 2 - Spacing.xl;
+  const chartWidth         = screenWidth - 50; // full-width card; 50px reserved for Y-axis labels
+
 
   // Which index is "current"? (today's DOW for weekly, current week for monthly)
   const todayIdx = useMemo(() => {
@@ -223,7 +224,7 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius:   Radii['2xl'],
+    borderRadius:   0,
     borderWidth:    1,
     overflow:       'hidden',
   },
@@ -231,8 +232,9 @@ const styles = StyleSheet.create({
     flexDirection:  'row',
     justifyContent: 'space-between',
     alignItems:     'flex-start',
-    padding:        Spacing.lg,
-    paddingBottom:  Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingTop:        Spacing.lg,
+    paddingBottom:     Spacing.sm,
   },
   legend: {
     gap: Spacing.xs,
@@ -249,9 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   chartWrapper: {
-    paddingLeft:    Spacing.sm,
-    paddingRight:   Spacing.sm,
-    paddingBottom:  Spacing.sm,
+    paddingBottom: Spacing.sm,
   },
   emptyState: {
     height:         160,

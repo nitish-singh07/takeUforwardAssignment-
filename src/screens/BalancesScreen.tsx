@@ -67,9 +67,9 @@ function getMonthDateRange(): { from: number; to: number } {
 }
 
 function healthLabel(score: number): string {
-  if (score > 700) return '🎉  Excellent financial health';
-  if (score > 400) return '👍  Stable financial health';
-  return '⚠️  High spending this period';
+  if (score > 700) return 'Excellent financial health';
+  if (score > 400) return 'Stable financial health';
+  return 'High spending this period';
 }
 
 // ─── Period Toggle ────────────────────────────────────────────────────────────
@@ -346,7 +346,7 @@ export const BalancesScreen: React.FC = () => {
         </View>
 
         {/* ── Bar chart ── */}
-        <View style={styles.section}>
+        <View style={styles.chartSection}>
           <SpendingChart
             data={chartData}
             period={period}
@@ -390,6 +390,10 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.md,
+  },
+  chartSection: {
+    gap:             Spacing.md,
+    marginHorizontal: -Spacing['2xl'], // bleed to screen edges
   },
   sectionHeader: {
     flexDirection:  'row',
