@@ -1,4 +1,5 @@
 import * as Crypto from 'expo-crypto';
+import * as SQLite from 'expo-sqlite';
 import { getDatabase } from './client';
 import { ExpenseRecord } from '../types';
 
@@ -33,23 +34,39 @@ export class TransactionRepository {
       timestamp:      ts,
       created_at:     now,
       updated_at:     now,
-      sync_status:    'pending',
-      remote_id:      null,
     };
 
     await db.runAsync(
       `INSERT INTO transactions
          (id, user_id, type, amount, category, note, timestamp, created_at, updated_at,
-          sync_status, remote_id, merchant, payment_method)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          merchant, payment_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [tx.id, userId, type, tx.amount, tx.category, tx.description,
-       tx.timestamp, tx.created_at, tx.updated_at, tx.sync_status, tx.remote_id,
+       tx.timestamp, tx.created_at, tx.updated_at,
        tx.merchant ?? null, pm]
     );
 
     return tx;
   }
 
+
+  /**
+   * Helper to map a raw database row to an ExpenseRecord object.
+   */
+  private static mapRowToExpenseRecord(row: any): ExpenseRecord {
+    return {
+      id:             row.id,
+      category:       row.category,
+      amount:         row.amount,
+      description:    row.note,
+      merchant:       row.merchant || undefined,
+      payment_method: row.payment_method || 'cash',
+      trend:          row.type === 'income' ? 'increment' : 'decrement',
+      timestamp:      row.timestamp,
+      created_at:     row.created_at,
+      updated_at:     row.updated_at,
+    };
+  }
 
   /**
    * Full-featured search with optional filters:
@@ -97,26 +114,14 @@ export class TransactionRepository {
     params.push(limit);
 
     const rows = await db.getAllAsync<any>(
-      `SELECT id, type, amount, category, note, timestamp, created_at, updated_at, sync_status, remote_id
-       FROM transactions
+      `SELECT * FROM transactions
        WHERE ${conditions.join(' AND ')}
        ORDER BY timestamp DESC
        LIMIT ?;`,
       params
     );
 
-    return rows.map((row: any) => ({
-      id:          row.id,
-      category:    row.category,
-      amount:      row.amount,
-      description: row.note,
-      trend:       row.type === 'income' ? 'increment' : 'decrement',
-      timestamp:   row.timestamp,
-      created_at:  row.created_at,
-      updated_at:  row.updated_at,
-      sync_status: row.sync_status,
-      remote_id:   row.remote_id,
-    } as ExpenseRecord));
+    return rows.map(this.mapRowToExpenseRecord);
   }
 
   /**
@@ -125,22 +130,25 @@ export class TransactionRepository {
   static async getHistory(userId: string, limit = 50): Promise<ExpenseRecord[]> {
     const db = await getDatabase();
     const rows = await db.getAllAsync<any>(
-      'SELECT id, type, amount, category, note, timestamp, created_at, updated_at, sync_status, remote_id FROM transactions WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?;',
+      'SELECT * FROM transactions WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?;',
       [userId, limit]
     );
 
-    return rows.map((row: any) => ({
-      id: row.id,
-      category: row.category,
-      amount: row.amount,
-      description: row.note,
-      trend: row.type === 'income' ? 'increment' : 'decrement',
-      timestamp: row.timestamp,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      sync_status: row.sync_status,
-      remote_id: row.remote_id,
-    }));
+    return rows.map(this.mapRowToExpenseRecord);
+  }
+
+  /**
+   * Internal helper to fetch income/expense/balance summaries for a given query.
+   */
+  private static async fetchSummary(
+    db: SQLite.SQLiteDatabase,
+    sql: string,
+    params: any[]
+  ): Promise<{ income: number; expense: number; balance: number }> {
+    const rows = await db.getAllAsync<{ type: string; total: number }>(sql, params);
+    const income  = rows.find((r: { type: string }) => r.type === 'income')?.total  ?? 0;
+    const expense = rows.find((r: { type: string }) => r.type === 'expense')?.total ?? 0;
+    return { income, expense, balance: income - expense };
   }
 
   /**
@@ -148,42 +156,36 @@ export class TransactionRepository {
    */
   static async getMonthlySummary(userId: string, monthYear: string): Promise<{ income: number; expense: number; balance: number }> {
     const db = await getDatabase();
-    
-    // We expect monthYear in format 'YYYY-MM'
-    // For local SQLite performance, we calculate aggregation directly
-    const result = await db.getAllAsync<{ type: string; total: number }>(
+    return this.fetchSummary(
+      db,
       `SELECT type, SUM(amount) as total 
        FROM transactions 
        WHERE user_id = ? AND strftime('%Y-%m', datetime(timestamp / 1000, 'unixepoch')) = ?
        GROUP BY type;`,
       [userId, monthYear]
     );
-
-    const income = result.find(r => r.type === 'income')?.total || 0;
-    const expense = result.find(r => r.type === 'expense')?.total || 0;
-
-    return {
-      income,
-      expense,
-      balance: income - expense,
-    };
   }
 
   /**
-   * Update an existing transaction.
+   * Update an existing transaction with full field support.
    */
   static async updateTransaction(
-    id: string,
-    amount: number,
-    category: string,
-    note: string,
-    type: 'income' | 'expense'
+    id:             string,
+    amount:         number,
+    category:       string,
+    note:           string,
+    type:           'income' | 'expense',
+    merchant?:      string,
+    payment_method?: string,
+    timestamp?:     number
   ): Promise<void> {
     const db = await getDatabase();
     const now = Date.now();
     await db.runAsync(
-      'UPDATE transactions SET amount = ?, category = ?, note = ?, type = ?, updated_at = ? WHERE id = ?;',
-      [amount, category, note, type, now, id]
+      `UPDATE transactions 
+       SET amount = ?, category = ?, note = ?, type = ?, merchant = ?, payment_method = ?, timestamp = ?, updated_at = ? 
+       WHERE id = ?;`,
+      [amount, category, note, type, merchant ?? null, payment_method ?? 'cash', timestamp ?? now, now, id]
     );
   }
 
@@ -245,16 +247,14 @@ export class TransactionRepository {
     userId: string
   ): Promise<{ income: number; expense: number }> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<{ type: string; total: number }>(
+    return this.fetchSummary(
+      db,
       `SELECT type, SUM(amount) AS total
        FROM transactions
        WHERE user_id = ?
        GROUP BY type;`,
       [userId]
     );
-    const income  = rows.find(r => r.type === 'income')?.total  ?? 0;
-    const expense = rows.find(r => r.type === 'expense')?.total ?? 0;
-    return { income, expense };
   }
 
   /**
@@ -319,7 +319,8 @@ export class TransactionRepository {
     toDate:   number
   ): Promise<{ income: number; expense: number; balance: number }> {
     const db   = await getDatabase();
-    const rows = await db.getAllAsync<{ type: string; total: number }>(
+    return this.fetchSummary(
+      db,
       `SELECT type, SUM(amount) AS total
        FROM transactions
        WHERE user_id = ?
@@ -328,9 +329,6 @@ export class TransactionRepository {
        GROUP BY type;`,
       [userId, fromDate, toDate]
     );
-    const income  = rows.find(r => r.type === 'income')?.total  ?? 0;
-    const expense = rows.find(r => r.type === 'expense')?.total ?? 0;
-    return { income, expense, balance: income - expense };
   }
 }
 

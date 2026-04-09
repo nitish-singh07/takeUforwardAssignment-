@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "temp_ts_app",
-    "slug": "temp_ts_app",
+    "name": "Payu",
+    "slug": "payu",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.naazzixx.temp_ts_app"
+      "package": "com.naazzixx.payu"
     },
     "web": {
       "favicon": "./assets/favicon.png"

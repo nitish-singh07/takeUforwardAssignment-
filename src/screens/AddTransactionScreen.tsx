@@ -208,7 +208,10 @@ export const AddTransactionScreen: React.FC = () => {
         isSpend ? 'expense' : 'income',
         category,
         parseFloat(amount),
-        note || undefined
+        note || undefined,
+        merchant || undefined,
+        paymentMethod,
+        date.getTime()
       );
     } else {
       // Logic for adding new
@@ -503,7 +506,8 @@ export const AddTransactionScreen: React.FC = () => {
           { 
             borderTopColor: colors.border, 
             backgroundColor: colors.background,
-            paddingBottom: keyboardVisible ? Spacing.md : insets.bottom + Spacing.md
+            paddingBottom: keyboardVisible ? Spacing.md : insets.bottom + Spacing.md,
+            justifyContent: editRecord ? 'flex-end' : 'space-between'
           }
         ]}>
           {!editRecord && (
@@ -597,7 +601,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 2,
     gap: Spacing.sm,
   },
@@ -710,7 +714,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     gap: Spacing.lg,
   },
-  saveAnotherBtn: { flex: 1, alignItems: 'center' },
+  saveAnotherBtn: { 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
   saveBtn: { borderRadius: Radii.xl, overflow: 'hidden' },
   saveGrad: {
     flexDirection: 'row',

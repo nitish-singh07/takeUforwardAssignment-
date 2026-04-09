@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Spacing, Radii } from '../../constants/theme';
 import { Typography } from '../common/Typography';
 import { useTheme } from '../../context/ThemeContext';
@@ -62,33 +63,37 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = ({
     <TouchableOpacity
       onPress={onPress}
       onLongPress={onLongPress}
-      activeOpacity={0.7}
-      style={[
-        styles.row,
-        { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-      ]}
+      activeOpacity={0.8}
+      style={styles.container}
     >
-      {/* Category icon box */}
-      <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-        <Ionicons name={config.icon} size={22} color={config.color} />
-      </View>
+      <LinearGradient
+        colors={colors.gradients.itemCard as unknown as [string, string, ...string[]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.row, { borderColor: colors.border }]}
+      >
+        {/* Category icon box */}
+        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+          <Ionicons name={config.icon} size={22} color={config.color} />
+        </View>
 
-      {/* Text block */}
-      <View style={styles.textBlock}>
-        <Typography variant="bodySemiBold">{title}</Typography>
-        {timestamp ? (
-          <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: -1 }}>
-            {formatDate(timestamp)}
+        {/* Text block */}
+        <View style={styles.textBlock}>
+          <Typography variant="bodySemiBold">{title}</Typography>
+          {timestamp ? (
+            <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: -1 }}>
+              {formatDate(timestamp)}
+            </Typography>
+          ) : null}
+        </View>
+
+        {/* Amount */}
+        <View style={styles.amountBlock}>
+          <Typography variant="bodySemiBold" style={{ color: amountColor }}>
+            {amount}
           </Typography>
-        ) : null}
-      </View>
-
-      {/* Amount */}
-      <View style={styles.amountBlock}>
-        <Typography variant="bodySemiBold" style={{ color: amountColor }}>
-          {amount}
-        </Typography>
-      </View>
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 };
@@ -96,6 +101,9 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = ({
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  container: {
+    marginBottom: Spacing.sm,
+  },
   row: {
     flexDirection:  'row',
     alignItems:     'center',
@@ -103,7 +111,6 @@ const styles = StyleSheet.create({
     borderWidth:    1,
     padding:        Spacing.md,
     gap:            Spacing.md,
-    marginBottom:   Spacing.sm,
   },
   iconBox: {
     width:          46,

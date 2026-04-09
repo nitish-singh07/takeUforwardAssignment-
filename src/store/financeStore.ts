@@ -35,12 +35,15 @@ interface FinanceState {
 
   /** Update an existing transaction by id. */
   updateTransaction: (
-    id:       string,
-    userId:   string,
-    type:     'income' | 'expense',
-    category: string,
-    amount:   number,
-    note?:    string
+    id:             string,
+    userId:         string,
+    type:           'income' | 'expense',
+    category:       string,
+    amount:         number,
+    note?:          string,
+    merchant?:      string,
+    payment_method?: string,
+    timestamp?:     number
   ) => Promise<boolean>;
 
   /** Permanently remove a transaction. */
@@ -104,10 +107,10 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     }
   },
 
-  updateTransaction: async (id, userId, type, category, amount, note) => {
+  updateTransaction: async (id, userId, type, category, amount, note, merchant, payment_method, timestamp) => {
     set({ loading: true });
     try {
-      await TransactionRepository.updateTransaction(id, amount, category, note ?? '', type);
+      await TransactionRepository.updateTransaction(id, amount, category, note ?? '', type, merchant, payment_method, timestamp);
       await get().recalculateUserMetrics(userId);
       await get().fetchData(userId);
       return true;

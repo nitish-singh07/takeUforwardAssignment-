@@ -47,13 +47,11 @@ export class UserRepository {
       totalSpendings: 0,
       created_at: now,
       updated_at: now,
-      sync_status: 'pending',
-      remote_id: null,
     };
 
     await db.runAsync(
-      `INSERT INTO users (id, fullName, email, password, balance, totalSpendings, created_at, updated_at, sync_status, remote_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO users (id, fullName, email, password, balance, totalSpendings, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         user.id,
         user.fullName,
@@ -63,8 +61,6 @@ export class UserRepository {
         user.totalSpendings,
         user.created_at,
         user.updated_at,
-        user.sync_status,
-        user.remote_id,
       ]
     );
 
@@ -145,7 +141,7 @@ export class UserRepository {
   static async deleteAccount(userId: string): Promise<void> {
     const db = await getDatabase();
     await db.withTransactionAsync(async () => {
-      await db.runAsync('DELETE FROM transactions WHERE userId = ?;', [userId]);
+      await db.runAsync('DELETE FROM transactions WHERE user_id = ?;', [userId]);
       await db.runAsync('DELETE FROM users WHERE id = ?;', [userId]);
     });
   }
