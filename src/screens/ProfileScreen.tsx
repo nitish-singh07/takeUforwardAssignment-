@@ -8,7 +8,7 @@
 import React, { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { CentralModal }    from '../components/common/CentralModal';
+import { CentralModal } from '../components/common/CentralModal';
 import { ThemePickerSheet } from '../components/common/ThemePickerSheet';
 import {
   ProfileHeroCard,
@@ -19,20 +19,20 @@ import {
   EditProfileSheetHandle,
 } from '../components/profile';
 
-import { useAuthStore }     from '../store/authStore';
-import { useTheme }         from '../context/ThemeContext';
-import * as Haptics         from 'expo-haptics';
-import BottomSheet          from '@gorhom/bottom-sheet';
-import { Typography }       from '../components/common/Typography';
-import { Spacing }          from '../constants/theme';
+import { useAuthStore } from '../store/authStore';
+import { useTheme } from '../context/ThemeContext';
+import * as Haptics from 'expo-haptics';
+import BottomSheet from '@gorhom/bottom-sheet';
+import { Typography } from '../components/common/Typography';
+import { Spacing } from '../constants/theme';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ModalInfo = {
-  visible:  boolean;
-  title:    string;
-  message:  string;
-  type:     'success' | 'error' | 'warning' | 'info';
+  visible: boolean;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
   onConfirm?: () => void;
   confirmLabel?: string;
 };
@@ -48,12 +48,12 @@ export const ProfileScreen: React.FC = () => {
   const { colors, themeMode } = useTheme();
 
   // Sheet refs
-  const editSheetRef    = useRef<EditProfileSheetHandle>(null);
-  const themePickerRef  = useRef<BottomSheet>(null);
+  const editSheetRef = useRef<EditProfileSheetHandle>(null);
+  const themePickerRef = useRef<BottomSheet>(null);
 
   // Edit-form state
-  const [editName,  setEditName]  = useState(user?.fullName ?? '');
-  const [editEmail, setEditEmail] = useState(user?.email    ?? '');
+  const [editName, setEditName] = useState(user?.fullName ?? '');
+  const [editEmail, setEditEmail] = useState(user?.email ?? '');
 
   // Single modal state handles both info and confirm flows
   const [modal, setModal] = useState<ModalInfo>(CLOSED_MODAL);
@@ -61,9 +61,9 @@ export const ProfileScreen: React.FC = () => {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const showInfo = (
-    title:   string,
+    title: string,
     message: string,
-    type:    ModalInfo['type'] = 'info',
+    type: ModalInfo['type'] = 'info',
   ) => setModal({ visible: true, title, message, type });
 
   const closeModal = () => setModal(CLOSED_MODAL);
@@ -71,8 +71,8 @@ export const ProfileScreen: React.FC = () => {
   // ── Edit profile ───────────────────────────────────────────────────────────
 
   const openEditSheet = () => {
-    setEditName(user?.fullName  ?? '');
-    setEditEmail(user?.email    ?? '');
+    setEditName(user?.fullName ?? '');
+    setEditEmail(user?.email ?? '');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     editSheetRef.current?.open();
   };
@@ -94,10 +94,10 @@ export const ProfileScreen: React.FC = () => {
   const handleSignOutPress = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     setModal({
-      visible:      true,
-      title:        'Sign Out',
-      message:      'Are you sure you want to sign out of your account?',
-      type:         'warning',
+      visible: true,
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out of your account?',
+      type: 'warning',
       confirmLabel: 'Sign Out',
       onConfirm: () => {
         closeModal();
@@ -112,10 +112,10 @@ export const ProfileScreen: React.FC = () => {
   const handleDeletePress = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     setModal({
-      visible:      true,
-      title:        'Delete Account',
-      message:      'This will permanently erase your account and all transactions. This action cannot be undone.',
-      type:         'error',
+      visible: true,
+      title: 'Delete Account',
+      message: 'This will permanently erase your account and all transactions. This action cannot be undone.',
+      type: 'error',
       confirmLabel: 'Delete',
       onConfirm: async () => {
         closeModal();
@@ -164,7 +164,7 @@ export const ProfileScreen: React.FC = () => {
           {/* Footer */}
           <View style={styles.footer}>
             <Typography variant="caption" style={{ color: colors.textTertiary }}>
-              PayU Finance Manager • LocalFirst
+              PayU Finance Manager
             </Typography>
           </View>
         </ScrollView>
@@ -205,6 +205,7 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    marginTop: 20,
   },
   scrollContent: {
     paddingBottom: Spacing['4xl'],

@@ -112,20 +112,18 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
           height={160}
           barWidth={BAR_WIDTH}
           maxValue={yAxisMax}
-          noOfSections={4} // show 4 segments for better tracking
+          noOfSections={4}
           yAxisTextStyle={{ color: colors.textTertiary, fontSize: 10 }}
           yAxisColor={colors.border}
           yAxisThickness={0}
           formatYLabel={formatChartY}
           xAxisColor={colors.border}
           xAxisThickness={1}
-          // Grid lines (Rules)
           showVerticalLines={false}
           rulesType="dashed"
-          rulesColor={colors.border} // subtler dashed lines
+          rulesColor={colors.border}
           dashWidth={5}
           dashGap={3}
-          // Premium Gradient Config
           showGradient
           gradientColor={colors.backgroundSecondary}
           barBorderRadius={8}

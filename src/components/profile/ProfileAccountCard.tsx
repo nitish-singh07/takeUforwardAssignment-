@@ -57,7 +57,7 @@ export const ProfileAccountCard: React.FC<ProfileAccountCardProps> = ({
         <SettingsRow
           icon="trash-outline"
           label="Delete Account"
-          caption="Irreversible — all data will be erased"
+          caption="Irreversible"
           iconBoxColor={colors.error + '1A'}
           iconColor={colors.error}
           labelColor={colors.error}
