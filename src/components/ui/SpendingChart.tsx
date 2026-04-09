@@ -1,14 +1,3 @@
-/**
- * SpendingChart
- *
- * Grouped bar chart (Income vs Expense) powered by react-native-gifted-charts.
- * Switches between weekly (per day) and monthly (per week) data views.
- *
- * Y-axis shows dollar-formatted labels.
- * X-axis labels show day names (Mon, Tue…) or week names (Wk 1, Wk 2…).
- * Today (weekly view) / current week (monthly view) bars are highlighted.
- */
-
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
@@ -17,26 +6,21 @@ import { useTheme } from '../../context/ThemeContext';
 import { WeeklyDataPoint } from '../../store/financeStore';
 import { Spacing, Radii } from '../../constants/theme';
 import { formatChartY, formatCurrency } from '../../utils/currency';
-import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const INCOME_COLOR  = '#10b981';
-const EXPENSE_COLOR = '#ef4444';
-const BAR_WIDTH     = 14;
-const BAR_SPACING   = 4;   // between income and expense bars in the same group
-const GROUP_SPACING = 18;  // between groups
+const BAR_WIDTH = 30;
+const GROUP_SPACING = 32;  // between groups in separate charts
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface SpendingChartProps {
-  data:            WeeklyDataPoint[];
-  period:          'weekly' | 'monthly';
-  periodIncome:    number;
-  periodExpense:   number;
-  periodLabel:     string;  // e.g. "Week of 7 Apr" or "April 2026"
+  data: WeeklyDataPoint[];
+  period: 'weekly' | 'monthly';
+  periodIncome: number;
+  periodExpense: number;
+  periodLabel: string;  // e.g. "Week of 7 Apr" or "April 2026"
 }
-
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -47,59 +31,67 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
   periodExpense,
   periodLabel,
 }) => {
-  const { colors, scheme } = useTheme();
-  const screenWidth        = Dimensions.get('window').width;
-  const chartWidth         = screenWidth - 50; // full-width card; 50px reserved for Y-axis labels
+  const { colors } = useTheme();
+  const screenWidth = Dimensions.get('window').width;
+  const chartWidth = screenWidth - 50;
 
+  // Colors from creditCard gradient
+  const EXPENSE_COLOR = '#FBDE9D'; // Gold/Peach
+  const INCOME_COLOR = '#3BB9A1'; // Teal
 
   // Which index is "current"? (today's DOW for weekly, current week for monthly)
   const todayIdx = useMemo(() => {
     if (period === 'weekly') return new Date().getDay(); // 0=Sun
-    // current week of month: day 1-7 → 0, 8-14 → 1, etc.
     return Math.min(Math.floor((new Date().getDate() - 1) / 7), 3);
   }, [period]);
 
   const isEmpty = data.every(d => d.income === 0 && d.expense === 0);
 
-  // Build gifted-charts bar data:
-  // Each DataPoint group = two bars (income, expense) + spacing gap after
-  const barData = useMemo(() => {
-    const items: any[] = [];
-    data.forEach((point, i) => {
-      const isCurrentPeriod = i === todayIdx;
-      const alpha = isCurrentPeriod ? 'FF' : 'AA';
-
-      // Income bar
-      items.push({
-        value:       point.income,
-        frontColor:  INCOME_COLOR + alpha,
-        label:       point.label,
+  // 1. Expense Bar Data
+  const expenseBarData = useMemo(() => {
+    return data.map((point, i) => {
+      const isCurrent = i === todayIdx;
+      return {
+        value: point.expense,
+        frontColor: EXPENSE_COLOR,
+        label: point.label,
         labelTextStyle: {
-          color:      isCurrentPeriod ? colors.text : colors.textTertiary,
-          fontSize:   10,
-          fontWeight: isCurrentPeriod ? '700' : '400',
-          width:      BAR_WIDTH * 2 + BAR_SPACING + 4,
-          textAlign:  'center',
+          color: isCurrent ? colors.text : colors.textTertiary,
+          fontSize: 10,
+          fontWeight: isCurrent ? '700' : '400',
+          width: BAR_WIDTH + 10,
+          textAlign: 'center',
         },
-        spacing: BAR_SPACING,
-      });
-
-      // Expense bar (no label — label on income covers the group)
-      items.push({
-        value:       point.expense,
-        frontColor:  EXPENSE_COLOR + alpha,
-        spacing:     GROUP_SPACING,
-      });
+        spacing: GROUP_SPACING,
+      };
     });
-    return items;
-  }, [data, todayIdx, colors]);
+  }, [data, todayIdx, colors, EXPENSE_COLOR]);
+
+  // 2. Income Bar Data
+  const incomeBarData = useMemo(() => {
+    return data.map((point, i) => {
+      const isCurrent = i === todayIdx;
+      return {
+        value: point.income,
+        frontColor: INCOME_COLOR,
+        label: point.label,
+        labelTextStyle: {
+          color: isCurrent ? colors.text : colors.textTertiary,
+          fontSize: 10,
+          fontWeight: isCurrent ? '700' : '400',
+          width: BAR_WIDTH + 10,
+          textAlign: 'center',
+        },
+        spacing: GROUP_SPACING,
+      };
+    });
+  }, [data, todayIdx, colors, INCOME_COLOR]);
 
   const maxValue = useMemo(() => {
     const all = data.flatMap(d => [d.income, d.expense]);
-    return Math.max(...all, 100); // min 100 so empty chart still looks reasonable
+    return Math.max(...all, 100);
   }, [data]);
 
-  // Round up maxValue to a nice number for the Y-axis
   const yAxisMax = useMemo(() => {
     const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
     return Math.ceil(maxValue / magnitude) * magnitude;
@@ -107,31 +99,56 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
 
   const noActivityLabel = period === 'weekly' ? 'No activity this week' : 'No activity this month';
 
-  return (
-    <View style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+  const renderChart = (barData: any[], color: string, title: string) => (
+    <View style={styles.chartSection}>
+      <View style={styles.chartHeader}>
+        <Typography variant="heading4">{title}</Typography>
+        <View style={[styles.colorIndicator, { backgroundColor: color }]} />
+      </View>
+      <View key={data.map(d => `${d.income}-${d.expense}`).join(',')} style={styles.chartWrapper}>
+        <BarChart
+          data={barData}
+          width={chartWidth}
+          height={160}
+          barWidth={BAR_WIDTH}
+          maxValue={yAxisMax}
+          noOfSections={4} // show 4 segments for better tracking
+          yAxisTextStyle={{ color: colors.textTertiary, fontSize: 10 }}
+          yAxisColor={colors.border}
+          yAxisThickness={0}
+          formatYLabel={formatChartY}
+          xAxisColor={colors.border}
+          xAxisThickness={1}
+          // Grid lines (Rules)
+          showVerticalLines={false}
+          rulesType="dashed"
+          rulesColor={colors.border} // subtler dashed lines
+          dashWidth={5}
+          dashGap={3}
+          // Premium Gradient Config
+          showGradient
+          gradientColor={colors.backgroundSecondary}
+          barBorderRadius={8}
+          isAnimated
+          animationDuration={800}
+          backgroundColor="transparent"
+          disablePress
+        />
+      </View>
+    </View>
+  );
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <View>
-          <Typography variant="bodySemiBold">Spending Patterns</Typography>
-          <Typography variant="caption" style={{ color: colors.textTertiary, marginTop: 2 }}>
-            {periodLabel}
-          </Typography>
-        </View>
-        {/* Legend */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: INCOME_COLOR }]} />
-            <Typography variant="caption" style={{ color: colors.textSecondary }}>Income</Typography>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: EXPENSE_COLOR }]} />
-            <Typography variant="caption" style={{ color: colors.textSecondary }}>Expense</Typography>
-          </View>
-        </View>
+  return (
+    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+
+      {/* ── Period Info ── */}
+      <View style={styles.periodHeader}>
+        <Typography variant="bodySemiBold">Performance Summary</Typography>
+        <Typography variant="caption" style={{ color: colors.textTertiary }}>
+          {periodLabel}
+        </Typography>
       </View>
 
-      {/* ── Chart or empty state ── */}
       {isEmpty ? (
         <View style={styles.emptyState}>
           <Typography variant="caption" style={{ color: colors.textTertiary }}>
@@ -139,69 +156,39 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
           </Typography>
         </View>
       ) : (
-        <View key={data.map(d => `${d.income}-${d.expense}`).join(',')} style={styles.chartWrapper}>
-          <BarChart
-            data={barData}
-            width={chartWidth}
-            height={180}
-            barWidth={BAR_WIDTH}
-            maxValue={yAxisMax}
-            noOfSections={4}
-            // Y-axis
-            yAxisTextStyle={{ color: colors.textTertiary, fontSize: 10 }}
-            yAxisColor={colors.border}
-            yAxisThickness={1}
-            formatYLabel={formatChartY}
-            // X-axis
-            xAxisColor={colors.border}
-            xAxisThickness={1}
-            // Reference lines (horizontal gridlines)
-            showReferenceLine1
-            referenceLine1Position={yAxisMax * 0.5}
-            referenceLine1Config={{
-              color:     colors.border,
-              dashWidth: 4,
-              dashGap:   6,
-              thickness: 1,
-            }}
-            // Visual
-            barBorderRadius={4}
-            isAnimated
-            animationDuration={600}
-            // Background
-            backgroundColor="transparent"
-            // Avoid clipping
-            disablePress
-          />
+        <View style={styles.chartsColumn}>
+          {renderChart(expenseBarData, EXPENSE_COLOR, 'Spending Patterns')}
+          <View style={[styles.chartDivider, { backgroundColor: colors.border }]} />
+          {renderChart(incomeBarData, INCOME_COLOR, 'Income Patterns')}
         </View>
       )}
 
       {/* ── Footer summary ── */}
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
         <View style={styles.footerItem}>
-          <Typography variant="caption" style={{ color: colors.textTertiary }}>
-            {period === 'weekly' ? 'Week Income' : 'Month Income'}
+          <Typography variant="caption" style={styles.footerLabel}>
+            INCOME
           </Typography>
           <Typography variant="bodySemiBold" style={{ color: INCOME_COLOR }}>
-            {formatCurrency(periodIncome)}
+            +{formatCurrency(periodIncome)}
           </Typography>
         </View>
 
         <View style={[styles.footerDivider, { backgroundColor: colors.border }]} />
 
         <View style={styles.footerItem}>
-          <Typography variant="caption" style={{ color: colors.textTertiary }}>
-            {period === 'weekly' ? 'Week Expense' : 'Month Expense'}
+          <Typography variant="caption" style={styles.footerLabel}>
+            EXPENSES
           </Typography>
           <Typography variant="bodySemiBold" style={{ color: EXPENSE_COLOR }}>
-            {formatCurrency(periodExpense)}
+            −{formatCurrency(periodExpense)}
           </Typography>
         </View>
 
         <View style={[styles.footerDivider, { backgroundColor: colors.border }]} />
 
         <View style={styles.footerItem}>
-          <Typography variant="caption" style={{ color: colors.textTertiary }}>Net</Typography>
+          <Typography variant="caption" style={styles.footerLabel}>NET</Typography>
           <Typography
             variant="bodySemiBold"
             style={{ color: periodIncome - periodExpense >= 0 ? INCOME_COLOR : EXPENSE_COLOR }}
@@ -217,50 +204,60 @@ export const SpendingChart: React.FC<SpendingChartProps> = ({
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius:   0,
-    borderWidth:    1,
-    overflow:       'hidden',
+  container: {
+    borderRadius: 0,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  header: {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    alignItems:     'flex-start',
-    paddingHorizontal: Spacing.lg,
-    paddingTop:        Spacing.lg,
-    paddingBottom:     Spacing.sm,
-  },
-  legend: {
-    gap: Spacing.xs,
-    alignItems: 'flex-end',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           Spacing.xs,
-  },
-  legendDot: {
-    width:        8,
-    height:       8,
-    borderRadius: 4,
-  },
-  chartWrapper: {
+  periodHeader: {
+    padding: Spacing.lg,
     paddingBottom: Spacing.sm,
   },
+  chartsColumn: {
+    paddingBottom: Spacing.lg,
+  },
+  chartSection: {
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  colorIndicator: {
+    width: 24,
+    height: 4,
+    borderRadius: 2,
+  },
+  chartWrapper: {
+    paddingBottom: Spacing.xs,
+  },
+  chartDivider: {
+    height: 1,
+    marginVertical: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+  },
   emptyState: {
-    height:         160,
+    height: 160,
     justifyContent: 'center',
-    alignItems:     'center',
+    alignItems: 'center',
   },
   footer: {
-    flexDirection:  'row',
+    flexDirection: 'row',
     borderTopWidth: 1,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   footerItem: {
-    flex:        1,
-    alignItems:  'center',
-    gap:         3,
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  footerLabel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 9,
+    letterSpacing: 0.5,
   },
   footerDivider: {
     width: 1,
