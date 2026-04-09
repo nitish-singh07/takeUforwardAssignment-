@@ -13,6 +13,7 @@ import { Typography } from '../components/common/Typography';
 import { ExpenseListItem } from '../components/ui/ExpenseListItem';
 import { HeroCard } from '../components/ui/HeroCard';
 import { TabSwitch, TabSwitchOption } from '../components/common/TabSwitch';
+import { TransactionSkeleton } from '../components/ui/TransactionSkeleton';
 import { useAuthStore } from '../store/authStore';
 import { useFinanceStore } from '../store/financeStore';
 import { useSettingsStore } from '../store/settingsStore';
@@ -157,7 +158,14 @@ export const HomeScreen: React.FC = () => {
 
           {/* List */}
           <View style={styles.list}>
-            {transactions.length === 0 ? (
+            {loading && transactions.length === 0 ? (
+              /* ── Loading state ── */
+              <View>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <TransactionSkeleton key={i} />
+                ))}
+              </View>
+            ) : transactions.length === 0 ? (
               /* ── Styled empty state ── */
               <View style={[styles.emptyState, { borderColor: colors.border }]}>
                 <View style={[styles.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
@@ -228,8 +236,6 @@ export const HomeScreen: React.FC = () => {
     </View>
   );
 };
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
