@@ -1,14 +1,3 @@
-/**
- * BalancesScreen — Analytics
- *
- * Shows all financial analytics with a Weekly / Monthly period toggle.
- * Switching the period updates:
- *   1. Header subtitle (period label)
- *   2. Spending Patterns bar chart (weekly days / monthly weeks)
- *   3. Overview Card (income / expense / balance for the selected period)
- *   4. Financial Health Gauge (score derived from selected period)
- */
-
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
@@ -25,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Typography } from '../components/common/Typography';
 import { CreditGauge } from '../components/ui/CreditGauge';
 import { SpendingChart } from '../components/ui/SpendingChart';
+import { PeriodToggle, PeriodToggleOption } from '../components/common/PeriodToggle';
 import { useAuthStore } from '../store/authStore';
 import { useFinanceStore } from '../store/financeStore';
 import { useSettingsStore } from '../store/settingsStore';
@@ -70,175 +60,6 @@ function healthLabel(score: number): string {
   if (score > 400) return 'Stable financial health';
   return 'High spending this period';
 }
-
-// ─── Period Toggle ────────────────────────────────────────────────────────────
-
-interface PeriodToggleProps {
-  value: Period;
-  onChange: (v: Period) => void;
-}
-
-const PeriodToggle: React.FC<PeriodToggleProps> = ({ value, onChange }) => {
-  const { colors } = useTheme();
-  return (
-    <View style={[toggleStyles.container, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-      {(['weekly', 'monthly'] as Period[]).map(p => {
-        const isActive = value === p;
-        return (
-          <TouchableOpacity
-            key={p}
-            onPress={() => onChange(p)}
-            activeOpacity={0.8}
-            style={[
-              toggleStyles.option,
-              isActive
-                ? { backgroundColor: colors.text }
-                : { backgroundColor: 'transparent' },
-            ]}
-          >
-            <Typography
-              variant="label"
-              style={{
-                color: isActive ? colors.background : colors.textSecondary,
-                fontWeight: isActive ? '700' : '500',
-                letterSpacing: 0.5,
-                textTransform: 'capitalize',
-              }}
-            >
-              {p === 'weekly' ? 'Weekly' : 'Monthly'}
-            </Typography>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
-
-// ─── Overview Card ────────────────────────────────────────────────────────────
-
-interface OverviewCardProps {
-  income:   number;
-  expense:  number;
-  balance:  number;
-  period:   Period;
-}
-
-const OverviewCard: React.FC<OverviewCardProps> = ({ income, expense, balance, period }) => {
-  const { colors } = useTheme();
-  const net        = income - expense;
-  const label      = period === 'weekly' ? 'This Week' : 'This Month';
-
-  return (
-    <LinearGradient
-      colors={net >= 0 ? ['#0f2027', '#203a43', '#2c5364'] : ['#1a0a0a', '#3a1010', '#5a1a1a']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={overviewStyles.card}
-    >
-      <View style={overviewStyles.topRow}>
-        <View>
-          <Typography variant="caption" style={{ color: 'rgba(255,255,255,0.6)' }}>
-            NET BALANCE
-          </Typography>
-          <Typography
-            variant="heading1"
-            style={{ color: '#fff', marginTop: 4 }}
-          >
-            {net >= 0 ? '+' : '−'}{formatCurrency(Math.abs(net))}
-          </Typography>
-        </View>
-        <View style={[overviewStyles.badge, { backgroundColor: net >= 0 ? '#10b981' + '30' : '#ef4444' + '30' }]}>
-          <Ionicons
-            name={net >= 0 ? 'trending-up' : 'trending-down'}
-            size={20}
-            color={net >= 0 ? '#10b981' : '#ef4444'}
-          />
-        </View>
-      </View>
-      <View style={[overviewStyles.divider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
-      <View style={overviewStyles.statsRow}>
-        <View style={overviewStyles.statItem}>
-          <View style={overviewStyles.statDot}>
-            <View style={[overviewStyles.dot, { backgroundColor: '#10b981' }]} />
-            <Typography variant="caption" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              {label} Income
-            </Typography>
-          </View>
-          <Typography variant="bodySemiBold" style={{ color: '#10b981' }}>
-            +{formatCurrency(income)}
-          </Typography>
-        </View>
-        <View style={overviewStyles.statItem}>
-          <View style={overviewStyles.statDot}>
-            <View style={[overviewStyles.dot, { backgroundColor: '#ef4444' }]} />
-            <Typography variant="caption" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              {label} Expenses
-            </Typography>
-          </View>
-          <Typography variant="bodySemiBold" style={{ color: '#ef4444' }}>
-            −{formatCurrency(expense)}
-          </Typography>
-        </View>
-      </View>
-    </LinearGradient>
-  );
-};
-
- const toggleStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    borderRadius: Radii.full,
-    borderWidth: 1,
-    padding: 3,
-    alignSelf: 'flex-start',
-  },
-  option: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xs + 2,
-    borderRadius: Radii.full,
-  },
-});
-
-const overviewStyles = StyleSheet.create({
-  card: {
-    borderRadius: Radii['2xl'],
-    padding: Spacing.xl,
-    gap: Spacing.lg,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  badge: {
-    width: 44,
-    height: 44,
-    borderRadius: Radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  divider: {
-    height: 1,
-  },
-  statsRow: {
-    gap: Spacing.sm,
-  },
-  statItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statDot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-});
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -302,6 +123,11 @@ export const BalancesScreen: React.FC = () => {
     (navigation as any).navigate('AddTransaction');
   };
 
+  const periodOptions: PeriodToggleOption<Period>[] = [
+    { label: 'Weekly', value: 'weekly' },
+    { label: 'Monthly', value: 'monthly' },
+  ];
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -321,7 +147,14 @@ export const BalancesScreen: React.FC = () => {
               {periodLabel}
             </Typography>
           </View>
-          <PeriodToggle value={period} onChange={setPeriod} />
+          <PeriodToggle
+            options={periodOptions}
+            value={period}
+            onChange={(val) => {
+              setPeriod(val);
+              triggerHaptic('selection');
+            }}
+          />
         </View>
 
         {/* ── Financial health gauge — first thing the user sees ── */}
@@ -333,16 +166,6 @@ export const BalancesScreen: React.FC = () => {
             </Typography>
           </View>
           <CreditGauge score={healthScore} label={healthLabel(healthScore)} />
-        </View>
-
-        {/* ── Overview card ── */}
-        <View style={styles.section}>
-          <OverviewCard
-            income={periodStats.income}
-            expense={periodStats.expense}
-            balance={periodStats.balance}
-            period={period}
-          />
         </View>
 
         {/* ── Bar chart ── */}

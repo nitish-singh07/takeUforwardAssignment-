@@ -51,4 +51,5 @@ export type RootStackParamList = {
   Search: undefined;
   AddTransaction: { transaction?: ExpenseRecord };
   TransactionDetails: { transaction: ExpenseRecord };
+  History: undefined;
 };

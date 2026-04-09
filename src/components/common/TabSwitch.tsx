@@ -12,45 +12,42 @@ import { Spacing, Radii } from '../../constants/theme';
 import { Typography } from './Typography';
 import { useTheme } from '../../context/ThemeContext';
 
-interface TabSwitchProps {
-  options: string[];
-  activeIndex?: number;
-  onSelect?: (index: number) => void;
-  style?: ViewStyle;
+export interface TabSwitchOption<T> {
+  label:  string;
+  value:  T;
+  count?: number;
 }
 
-export const TabSwitch: React.FC<TabSwitchProps> = ({
+interface TabSwitchProps<T> {
+  options:      TabSwitchOption<T>[];
+  value:        T;
+  onChange:     (value: T) => void;
+  style?:       ViewStyle;
+}
+
+export function TabSwitch<T>({
   options,
-  activeIndex: externalActiveIndex,
-  onSelect,
+  value,
+  onChange,
   style,
-}) => {
-  const [activeIndex, setActiveIndex] = useState(externalActiveIndex || 0);
+}: TabSwitchProps<T>) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [indicatorX] = useState(new Animated.Value(0));
   const { colors } = useTheme();
 
-  useEffect(() => {
-    if (externalActiveIndex !== undefined) {
-      setActiveIndex(externalActiveIndex);
-    }
-  }, [externalActiveIndex]);
+  const activeIndex = options.findIndex(opt => opt.value === value);
 
   useEffect(() => {
-    if (containerWidth > 0) {
+    if (containerWidth > 0 && activeIndex >= 0) {
       const tabWidth = containerWidth / options.length;
       Animated.spring(indicatorX, {
         toValue: activeIndex * tabWidth,
         useNativeDriver: true,
-        bounciness: 0,
+        bounciness: 2,
+        speed: 12,
       }).start();
     }
   }, [activeIndex, containerWidth, options.length]);
-
-  const handleSelect = (index: number) => {
-    setActiveIndex(index);
-    onSelect && onSelect(index);
-  };
 
   const onLayout = (event: LayoutChangeEvent) => {
     setContainerWidth(event.nativeEvent.layout.width);
@@ -61,20 +58,20 @@ export const TabSwitch: React.FC<TabSwitchProps> = ({
   return (
     <View
       onLayout={onLayout}
-      style={StyleSheet.flatten([
+      style={[
         styles.container,
         {
           backgroundColor: colors.backgroundSecondary,
           borderColor: colors.border,
         },
         style,
-      ])}
+      ]}
     >
       <Animated.View
         style={[
           styles.indicator,
           {
-            width: tabWidth - 4,
+            width: tabWidth - 6,
             backgroundColor: colors.background,
             borderColor: colors.border,
             borderWidth: 1,
@@ -83,56 +80,90 @@ export const TabSwitch: React.FC<TabSwitchProps> = ({
         ]}
       />
 
-      {options.map((option, index) => (
-        <TouchableOpacity
-          key={index}
-          onPress={() => handleSelect(index)}
-          style={[styles.tab, { width: tabWidth }]}
-          activeOpacity={1}
-        >
-          <Typography
-            variant="label"
-            color={activeIndex === index ? 'text' : 'textSecondary'}
-            style={StyleSheet.flatten([
-              styles.label,
-              activeIndex === index && styles.activeLabel,
-            ]) as TextStyle}
+      {options.map((option, index) => {
+        const isActive = activeIndex === index;
+        return (
+          <TouchableOpacity
+            key={index}
+            onPress={() => onChange(option.value)}
+            style={[styles.tab, { width: tabWidth }]}
+            activeOpacity={0.7}
           >
-            {option}
-          </Typography>
-        </TouchableOpacity>
-      ))}
+            <Typography
+              variant="label"
+              style={StyleSheet.flatten([
+                styles.label,
+                { color: isActive ? colors.text : colors.textSecondary },
+                isActive && styles.activeLabel,
+              ])}
+            >
+              {option.label}
+            </Typography>
+            
+            {option.count !== undefined && (
+              <View style={[
+                styles.badge,
+                { backgroundColor: isActive ? colors.text + '10' : colors.backgroundTertiary }
+              ]}>
+                <Typography variant="caption" style={styles.badgeText}>
+                  {option.count}
+                </Typography>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    height: 48,
-    borderRadius: Radii.lg,
-    padding: 2,
+    height: 44,
+    borderRadius: Radii.xl,
+    padding: 3,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    width: '100%',
   },
   indicator: {
     position: 'absolute',
-    height: 40,
-    borderRadius: Radii.md,
-    left: 2,
+    height: 36,
+    borderRadius: Radii.lg,
+    left: 3,
     zIndex: 0,
+    // Add subtle shadow for depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tab: {
     height: '100%',
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
+    gap: 6,
   },
   label: {
     fontWeight: '500',
+    letterSpacing: 0.3,
   },
   activeLabel: {
+    fontWeight: '700',
+  },
+  badge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    fontSize: 10,
     fontWeight: '700',
   },
 });

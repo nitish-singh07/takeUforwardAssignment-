@@ -27,6 +27,7 @@ import { ProfileScreen }         from './src/screens/ProfileScreen';
 import { SearchScreen }          from './src/screens/SearchScreen';
 import { AddTransactionScreen }  from './src/screens/AddTransactionScreen';
 import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
 
 LogBox.ignoreAllLogs();
 
@@ -125,6 +126,11 @@ function AuthenticatedStack() {
       <Stack.Screen
         name="TransactionDetails"
         component={TransactionDetailsScreen}
+        options={{ animation: 'slide_from_right', headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      />
+      <Stack.Screen
+        name="History"
+        component={HistoryScreen}
         options={{ animation: 'slide_from_right', headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
     </Stack.Navigator>
